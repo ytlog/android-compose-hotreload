@@ -16,6 +16,7 @@ internal class HostConfig(
     val bootClasspath: List<File>,
     /** The runtime classpath of the installed application (project classes and library classes) */
     val applicationClasspath: List<File>,
+    val resourceBundle: File,
 ) {
     companion object {
         const val CONFIG_FILE_PROPERTY = "compose.reload.android.config"
@@ -34,6 +35,7 @@ internal class HostConfig(
                 minSdk = string("minSdk").toInt(),
                 bootClasspath = files("bootClasspath"),
                 applicationClasspath = files("applicationClasspath"),
+                resourceBundle = File(string("resourceBundle")),
             )
         }
     }

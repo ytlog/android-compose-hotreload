@@ -59,6 +59,19 @@ public class ProtocolTest {
     }
 
     @Test
+    public void resourceOnlyReload() throws IOException {
+        Protocol.Reload reload = (Protocol.Reload) roundTrip(new Protocol.Reload(
+            "resources", Collections.emptyList(), Collections.emptyList(), new int[0], new byte[]{1, 7, 3}
+        ));
+        assertTrue(reload.definitions.isEmpty());
+        assertArrayEquals(new byte[]{1, 7, 3}, reload.resourceApk);
+        Protocol.Reload codeOnly = (Protocol.Reload) roundTrip(new Protocol.Reload(
+            "code", Collections.emptyList(), Collections.emptyList(), new int[0]
+        ));
+        assertNull(codeOnly.resourceApk);
+    }
+
+    @Test
     public void nullableFields() throws IOException {
         Protocol.UIRendered rendered = (Protocol.UIRendered) roundTrip(new Protocol.UIRendered(null, 3));
         assertNull(rendered.reloadRequestId);

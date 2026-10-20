@@ -20,6 +20,7 @@ android {
     }
 
     buildFeatures { compose = true }
+    androidResources { noCompress += "txt" }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

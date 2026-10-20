@@ -1,6 +1,7 @@
 package org.jetbrains.compose.reload.android
 
 import android.content.ContentProvider
+import android.app.Application
 import android.content.ContentValues
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -46,7 +47,10 @@ internal object AndroidHotReloadRuntime {
         runtimeError?.let { Log.e(TAG, "Compose Hot Reload is not available", it) }
 
         /* upstream 'ComposeTransformer': enable Compose hot reload mode once the Compose runtime is available */
-        runOnUiThreadBlocking { enableComposeHotReloadMode(loader) }
+        runOnUiThreadBlocking {
+            enableComposeHotReloadMode(loader)
+            ResourceHotReload.initialize(application as Application)
+        }
 
         val server = LocalServerSocket("${application.packageName}.compose-hot-reload")
         thread(name = "Compose Hot Reload", isDaemon = true) {

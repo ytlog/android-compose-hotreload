@@ -26,8 +26,11 @@ internal fun executeReload(loader: ClassLoader, codeCacheDir: File, reload: Prot
     runOnUiThreadBlocking {
         var classesAdded = false
         var classesRedefined = false
+        var resourcesChanged = false
+        var resourceProvider: android.content.res.loader.ResourcesProvider? = null
 
         val result = runCatching {
+            resourceProvider = reload.resourceApk?.let { ResourceHotReload.prepare(codeCacheDir, it) }
             /* Upstream only redefines and re-initializes classes which are loaded: capture before loading anything */
             val names = reload.definitions.map { it.className } + reload.reinitializeStatics
             val loadedBeforeReload = names.filterTo(HashSet()) { loader.isLoaded(it) }
@@ -72,6 +75,13 @@ internal fun executeReload(loader: ClassLoader, codeCacheDir: File, reload: Prot
                 Log.d(TAG, "Redefined ${redefinedClasses.size} classes")
             }
 
+            // Class admission failure leaves the previous provider intact. Statics may read the new resources.
+            resourceProvider?.let {
+                ResourceHotReload.apply(it)
+                resourceProvider = null // ownership transferred to the shared loader
+                resourcesChanged = true
+            }
+
             reload.reinitializeStatics.forEach { className ->
                 if (className !in loadedBeforeReload) return@forEach
                 Class.forName(className, false, loader).reinitializeStaticsIfNecessary()
@@ -83,9 +93,10 @@ internal fun executeReload(loader: ClassLoader, codeCacheDir: File, reload: Prot
                 invalidateGroupsWithKey(loader, key)
             }
         }
+        resourceProvider?.close()
 
         /* upstream 'executeAfterHotReloadListeners' is invoked for successful and failed reloads */
-        onHotReload(reload.reloadRequestId, result.exceptionOrNull())
+        onHotReload(reload.reloadRequestId, result.exceptionOrNull(), resourcesChanged)
 
         result.fold(
             onSuccess = {

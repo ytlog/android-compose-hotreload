@@ -51,6 +51,9 @@ abstract class AndroidHotRun : JavaExec() {
     @get:Internal
     abstract val hostConfigFile: RegularFileProperty
 
+    @get:Internal
+    abstract val resourceBundle: RegularFileProperty
+
     /** Same as upstream 'AbstractComposeHotRun.isAutoReloadEnabled' */
     @get:Internal
     @get:JvmName("getIsAutoReloadEnabled")
@@ -79,6 +82,7 @@ abstract class AndroidHotRun : JavaExec() {
         properties["minSdk"] = minSdk.get().toString()
         properties["bootClasspath"] = bootClasspath.files.joinToString(File.pathSeparator)
         properties["applicationClasspath"] = applicationClasspath.files.joinToString(File.pathSeparator)
+        properties["resourceBundle"] = resourceBundle.get().asFile.absolutePath
         configFile.outputStream().use { properties.store(it, "Compose Hot Reload: Android host") }
         systemProperty(HOST_CONFIG_PROPERTY, configFile.absolutePath)
         super.exec()
@@ -100,6 +104,7 @@ internal fun Project.registerHotRunTask(
     snapshotTask: TaskProvider<*>,
     hotFiles: FileCollection,
     coldFiles: FileCollection,
+    resourceBundle: Provider<RegularFile>,
 ) {
     val javaToolchains = extensions.getByType(JavaToolchainService::class.java)
 
@@ -128,6 +133,7 @@ internal fun Project.registerHotRunTask(
         task.applicationId.set(variant.applicationId)
         task.minSdk.set(variant.minSdk.apiLevel)
         task.applicationClasspath.from(hotFiles, coldFiles)
+        task.resourceBundle.set(resourceBundle)
         task.hostConfigFile.set(pidFile.map { it.asFile.resolveSibling("host.properties") }.let { file ->
             layout.file(file)
         })

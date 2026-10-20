@@ -26,7 +26,7 @@ public final class Protocol {
     }
 
     public static final int MAGIC = 0x43485241; // 'CHRA'
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
     public static final int MAX_FRAME_SIZE = 512 * 1024 * 1024;
 
     /* Host -> Device */
@@ -98,15 +98,25 @@ public final class Protocol {
         /** Classes whose statics shall be re-initialized, in execution order */
         public final List<String> reinitializeStatics;
         public final int[] invalidatedGroupKeys;
+        /** Optional APK containing resources and assets, without executable code. */
+        public final byte[] resourceApk;
 
         public Reload(
             String reloadRequestId, List<ClassDefinition> definitions,
             List<String> reinitializeStatics, int[] invalidatedGroupKeys
         ) {
+            this(reloadRequestId, definitions, reinitializeStatics, invalidatedGroupKeys, null);
+        }
+
+        public Reload(
+            String reloadRequestId, List<ClassDefinition> definitions,
+            List<String> reinitializeStatics, int[] invalidatedGroupKeys, byte[] resourceApk
+        ) {
             this.reloadRequestId = reloadRequestId;
             this.definitions = definitions;
             this.reinitializeStatics = reinitializeStatics;
             this.invalidatedGroupKeys = invalidatedGroupKeys;
+            this.resourceApk = resourceApk;
         }
 
         @Override int type() { return RELOAD; }
@@ -122,6 +132,8 @@ public final class Protocol {
             writeStrings(out, reinitializeStatics);
             out.writeInt(invalidatedGroupKeys.length);
             for (int key : invalidatedGroupKeys) out.writeInt(key);
+            out.writeBoolean(resourceApk != null);
+            if (resourceApk != null) writeBytes(out, resourceApk);
         }
 
         static Reload read(DataInputStream in) throws IOException {
@@ -134,7 +146,8 @@ public final class Protocol {
             List<String> reinitialize = readStrings(in);
             int[] groups = new int[readCount(in)];
             for (int i = 0; i < groups.length; i++) groups[i] = in.readInt();
-            return new Reload(id, definitions, reinitialize, groups);
+            byte[] resourceApk = in.readBoolean() ? readBytes(in) : null;
+            return new Reload(id, definitions, reinitialize, groups, resourceApk);
         }
     }
 

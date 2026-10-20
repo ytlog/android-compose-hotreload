@@ -1,0 +1,69 @@
+<resources>
+    <!-- One empty marker per generation bit: ThemeKey deduplicates repeated (style, force) pairs. -->
+    <style name="ComposeHotReloadResourceMarker0" />
+    <style name="ComposeHotReloadResourceMarker1" />
+    <style name="ComposeHotReloadResourceMarker2" />
+    <style name="ComposeHotReloadResourceMarker3" />
+    <style name="ComposeHotReloadResourceMarker4" />
+    <style name="ComposeHotReloadResourceMarker5" />
+    <style name="ComposeHotReloadResourceMarker6" />
+    <style name="ComposeHotReloadResourceMarker7" />
+    <style name="ComposeHotReloadResourceMarker8" />
+    <style name="ComposeHotReloadResourceMarker9" />
+    <style name="ComposeHotReloadResourceMarker10" />
+    <style name="ComposeHotReloadResourceMarker11" />
+    <style name="ComposeHotReloadResourceMarker12" />
+    <style name="ComposeHotReloadResourceMarker13" />
+    <style name="ComposeHotReloadResourceMarker14" />
+    <style name="ComposeHotReloadResourceMarker15" />
+    <style name="ComposeHotReloadResourceMarker16" />
+    <style name="ComposeHotReloadResourceMarker17" />
+    <style name="ComposeHotReloadResourceMarker18" />
+    <style name="ComposeHotReloadResourceMarker19" />
+    <style name="ComposeHotReloadResourceMarker20" />
+    <style name="ComposeHotReloadResourceMarker21" />
+    <style name="ComposeHotReloadResourceMarker22" />
+    <style name="ComposeHotReloadResourceMarker23" />
+    <style name="ComposeHotReloadResourceMarker24" />
+    <style name="ComposeHotReloadResourceMarker25" />
+    <style name="ComposeHotReloadResourceMarker26" />
+    <style name="ComposeHotReloadResourceMarker27" />
+    <style name="ComposeHotReloadResourceMarker28" />
+    <style name="ComposeHotReloadResourceMarker29" />
+    <style name="ComposeHotReloadResourceMarker30" />
+    <style name="ComposeHotReloadResourceMarker31" />
+    <array name="compose_hot_reload_resource_markers">
+        <item>@style/ComposeHotReloadResourceMarker0</item>
+        <item>@style/ComposeHotReloadResourceMarker1</item>
+        <item>@style/ComposeHotReloadResourceMarker2</item>
+        <item>@style/ComposeHotReloadResourceMarker3</item>
+        <item>@style/ComposeHotReloadResourceMarker4</item>
+        <item>@style/ComposeHotReloadResourceMarker5</item>
+        <item>@style/ComposeHotReloadResourceMarker6</item>
+        <item>@style/ComposeHotReloadResourceMarker7</item>
+        <item>@style/ComposeHotReloadResourceMarker8</item>
+        <item>@style/ComposeHotReloadResourceMarker9</item>
+        <item>@style/ComposeHotReloadResourceMarker10</item>
+        <item>@style/ComposeHotReloadResourceMarker11</item>
+        <item>@style/ComposeHotReloadResourceMarker12</item>
+        <item>@style/ComposeHotReloadResourceMarker13</item>
+        <item>@style/ComposeHotReloadResourceMarker14</item>
+        <item>@style/ComposeHotReloadResourceMarker15</item>
+        <item>@style/ComposeHotReloadResourceMarker16</item>
+        <item>@style/ComposeHotReloadResourceMarker17</item>
+        <item>@style/ComposeHotReloadResourceMarker18</item>
+        <item>@style/ComposeHotReloadResourceMarker19</item>
+        <item>@style/ComposeHotReloadResourceMarker20</item>
+        <item>@style/ComposeHotReloadResourceMarker21</item>
+        <item>@style/ComposeHotReloadResourceMarker22</item>
+        <item>@style/ComposeHotReloadResourceMarker23</item>
+        <item>@style/ComposeHotReloadResourceMarker24</item>
+        <item>@style/ComposeHotReloadResourceMarker25</item>
+        <item>@style/ComposeHotReloadResourceMarker26</item>
+        <item>@style/ComposeHotReloadResourceMarker27</item>
+        <item>@style/ComposeHotReloadResourceMarker28</item>
+        <item>@style/ComposeHotReloadResourceMarker29</item>
+        <item>@style/ComposeHotReloadResourceMarker30</item>
+        <item>@style/ComposeHotReloadResourceMarker31</item>
+    </array>
+</resources>

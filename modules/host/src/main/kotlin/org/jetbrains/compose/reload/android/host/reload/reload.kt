@@ -1,6 +1,7 @@
 package org.jetbrains.compose.reload.android.host.reload
 
 import org.jetbrains.compose.reload.android.host.session.ApplicationIndex
+import org.jetbrains.compose.reload.android.host.session.ResourceIndex
 import org.jetbrains.compose.reload.android.host.upstream.UpstreamAgent
 import org.jetbrains.compose.reload.android.host.device.Device
 import org.jetbrains.compose.reload.android.host.dex.Dexer
@@ -55,8 +56,11 @@ private val reloadGeneration = AtomicInteger(0)
 internal fun Context.reload(
     index: ApplicationIndex, dexer: Dexer, device: Device,
     pendingChanges: Map<File, ClassChange>,
+    resources: ResourceIndex,
     onDeviceRequest: (String) -> Unit,
 ): Try<ResolvedDirtyScopes> = Try {
+    // Validate before adding/redefining any classes, including mixed code/resource edits.
+    val resourceApk = resources.pending()
     val classPool = index.classPool()
 
     val definitions = pendingChanges.mapNotNull { (file, change) ->
@@ -150,6 +154,7 @@ internal fun Context.reload(
             },
             statics.reinitialize.map { it.toFqn() },
             groups,
+            resourceApk,
         )
     )
 
@@ -169,6 +174,8 @@ internal fun Context.reload(
     if (!result.success) {
         throw DeviceReloadException(result)
     }
+
+    resourceApk?.let(resources::commit)
 
     dirty
 }

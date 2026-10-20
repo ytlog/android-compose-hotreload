@@ -9,9 +9,31 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.ProvidedValue
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.ComposeView
 import org.jetbrains.compose.reload.android.protocol.Protocol
 import kotlinx.coroutines.flow.update
+
+/** LocalResources was introduced after LocalContext; keep older Compose applications usable. */
+@Suppress("UNCHECKED_CAST")
+private val resourcesLocal: ProvidableCompositionLocal<android.content.res.Resources>? by lazy {
+    runCatching {
+        Class.forName("androidx.compose.ui.platform.AndroidCompositionLocals_androidKt")
+            .getMethod("getLocalResources").invoke(null) as ProvidableCompositionLocal<android.content.res.Resources>
+    }.getOrNull()
+}
+
+@Suppress("UNCHECKED_CAST")
+private val imageVectorCacheLocal: ProvidableCompositionLocal<Any>? by lazy {
+    runCatching {
+        Class.forName("androidx.compose.ui.platform.AndroidCompositionLocals_androidKt")
+            .getMethod("getLocalImageVectorCache").invoke(null) as ProvidableCompositionLocal<Any>
+    }.getOrNull()
+}
 
 /**
  * Port of upstream 'hot-reload-runtime-jvm/DevelopmentEntryPoint.kt' (Android has no windows: no 'WindowId').
@@ -45,6 +67,13 @@ internal fun DevelopmentEntryPoint(child: @Composable () -> Unit) {
     }
 
     val currentHotReloadState by hotReloadState.collectAsState()
+    val baseContext = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val context = remember(baseContext, configuration, currentHotReloadState.resourceVersion) {
+        // Leave the normal context in place until the first resource update.
+        if (currentHotReloadState.resourceVersion == 0) baseContext
+        else resourceContext(baseContext, currentHotReloadState.resourceVersion)
+    }
 
     val intercepted: @Composable () -> Unit = {
         @Suppress("ILLEGAL_RUN_CATCHING_AROUND_COMPOSABLE")
@@ -60,7 +89,25 @@ internal fun DevelopmentEntryPoint(child: @Composable () -> Unit) {
         }.getOrThrow()
     }
 
-    CompositionLocalProvider(hotReloadStateLocal provides currentHotReloadState) {
+    val provided = arrayListOf<ProvidedValue<*>>(
+        hotReloadStateLocal provides currentHotReloadState, LocalContext provides context
+    )
+    // Keep Compose's configuration-dependent default until resources are overridden. Thereafter
+    // a configuration change creates a fresh resourceContext above, so its Resources also changes.
+    if (currentHotReloadState.resourceVersion != 0) {
+        val vectorCache = imageVectorCacheLocal?.current
+        remember(vectorCache, currentHotReloadState.resourceVersion) {
+            // Cache keys retain Theme and its Resources even when the cached vector is a weak reference.
+            // Prune before reading new painters, so old resource archives can be released.
+            if (vectorCache != null) runCatching {
+                vectorCache.javaClass.getMethod("clear").invoke(vectorCache)
+                Log.d(TAG, "Cleared Compose vector resource cache")
+            }.onFailure { Log.w(TAG, "Could not clear Compose vector resource cache", it) }
+            Unit
+        }
+        resourcesLocal?.let { provided += it provides context.resources }
+    }
+    CompositionLocalProvider(*provided.toTypedArray()) {
         key(currentHotReloadState.key) {
             intercepted()
         }
