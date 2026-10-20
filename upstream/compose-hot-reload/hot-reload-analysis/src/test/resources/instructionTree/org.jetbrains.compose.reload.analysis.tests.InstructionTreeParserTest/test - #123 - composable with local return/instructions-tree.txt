@@ -1,0 +1,195 @@
+/* Code */
+import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+ 
+@Composable
+fun Foo(value: Int) {
+    Text("A")
+    if(value > -12) {
+        Bar {
+            Text("B")
+            if(value > 0) return@Bar
+            if(value > 10) return@Foo
+            Text("C")
+        }
+    }
+    
+    Text("D")
+}
+
+@Composable
+inline fun Bar(content: @Composable () -> Unit) {
+    Text("Bar A")
+    content()
+    Text("Bar B")
+}
+
+ /* Tree */ 
+class TestKt {
+    fun Bar (Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V {
+        Method (group=ComposeGroupKey(key=1571995832)) {
+            LabelToken(L0)
+            BlockToken(5)
+            LabelToken(L1, lineNumber=21)
+            BlockToken(23)
+            LabelToken(L2, lineNumber=22)
+            BlockToken(8)
+            LabelToken(L3, lineNumber=23)
+            BlockToken(23)
+            LabelToken(L4, lineNumber=24)
+            ReturnToken(returnInsn=177)
+        }
+    }
+    
+    fun Foo$lambda$0$0 (IILandroidx/compose/runtime/Composer;I)Lkotlin/Unit; {
+        Method (group=null) {
+            LabelToken(L0)
+            BlockToken(8)
+            ReturnToken(returnInsn=176)
+        }
+    }
+    
+    fun Foo$lambda$1 (IILandroidx/compose/runtime/Composer;I)Lkotlin/Unit; {
+        Method (group=null) {
+            LabelToken(L0)
+            BlockToken(8)
+            ReturnToken(returnInsn=176)
+        }
+    }
+    
+    fun Foo (ILandroidx/compose/runtime/Composer;I)V {
+        Method (group=ComposeGroupKey(key=-643616831)) {
+            LabelToken(L0, lineNumber=5)
+            BlockToken(1)
+            BlockToken(1)
+            JumpToken(L20, opocde=198)
+            BlockToken(4)
+            JumpToken(L21, opocde=167)
+            LabelToken(L20)
+            BlockToken(2)
+            LabelToken(L21, lineNumber=11)
+            BlockToken(1)
+            ReturnToken(returnInsn=177)
+            BlockToken(1)
+            JumpToken(L32, opocde=198)
+            BlockToken(4)
+            JumpToken(L33, opocde=167)
+            LabelToken(L32)
+            BlockToken(2)
+            LabelToken(L33)
+            BlockToken(1)
+            ReturnToken(returnInsn=177)
+    
+            RestartGroup (group=ComposeGroupKey(key=-643616831)) {
+                StartRestartGroup(key=ComposeGroupKey(key=-643616831))
+                BlockToken(2)
+                CurrentMarkerToken(index=3)
+                BlockToken(2)
+                LabelToken(L1)
+                BlockToken(3)
+                JumpToken(L4, opocde=154)
+                BlockToken(4)
+                JumpToken(L2, opocde=153)
+                BlockToken(1)
+                JumpToken(L3, opocde=167)
+                LabelToken(L2)
+                BlockToken(2)
+                LabelToken(L3)
+                BlockToken(3)
+                LabelToken(L4)
+                BlockToken(6)
+                JumpToken(L5, opocde=159)
+                BlockToken(1)
+                JumpToken(L6, opocde=167)
+                LabelToken(L5)
+                BlockToken(2)
+                LabelToken(L6)
+                BlockToken(5)
+                JumpToken(L30, opocde=153)
+                BlockToken(1)
+                JumpToken(L7, opocde=153)
+                BlockToken(5)
+                LabelToken(L7, lineNumber=6)
+                BlockToken(24)
+                LabelToken(L8, lineNumber=7)
+                BlockToken(2)
+                JumpToken(L28, opocde=164)
+                BlockToken(1)
+                BlockToken(1)
+                JumpToken(L19, opocde=153)
+                BlockToken(1)
+                LabelToken(L19, lineNumber=17)
+                BlockToken(2)
+                EndRestartGroup()
+                JumpToken(L29, opocde=167)
+                LabelToken(L28, lineNumber=14)
+                BlockToken(2)
+                LabelToken(L29, lineNumber=16)
+                BlockToken(25)
+                JumpToken(L31, opocde=153)
+                BlockToken(1)
+                JumpToken(L31, opocde=167)
+                LabelToken(L30, lineNumber=5)
+                BlockToken(3)
+                LabelToken(L31, lineNumber=17)
+                BlockToken(2)
+                EndRestartGroup()
+    
+                ReplaceGroup (group=ComposeGroupKey(key=-1254942773)) {
+                    StartReplaceGroup(key=ComposeGroupKey(key=-1254942773))
+                    BlockToken(4)
+                    LabelToken(L9, lineNumber=8)
+                    BlockToken(1)
+                    LabelToken(L10)
+                    BlockToken(2)
+                    LabelToken(L11, lineNumber=25)
+                    BlockToken(23)
+                    LabelToken(L12, lineNumber=26)
+                    BlockToken(6)
+                    LabelToken(L13)
+                    BlockToken(2)
+                    LabelToken(L14, lineNumber=9)
+                    BlockToken(1)
+                    LabelToken(L17, lineNumber=10)
+                    JumpToken(L24, opocde=167)
+                    LabelToken(L23, lineNumber=13)
+                    BlockToken(1)
+                    LabelToken(L24, lineNumber=26)
+                    BlockToken(2)
+                    LabelToken(L25, lineNumber=27)
+                    BlockToken(23)
+                    LabelToken(L26, lineNumber=28)
+                    BlockToken(1)
+                    LabelToken(L27, lineNumber=7)
+                    BlockToken(1)
+                    EndReplaceGroup()
+    
+                    ReplaceGroup (group=ComposeGroupKey(key=-1795835205)) {
+                        StartReplaceGroup(key=ComposeGroupKey(key=-1795835205))
+                        BlockToken(23)
+                        LabelToken(L15, lineNumber=10)
+                        BlockToken(1)
+                        JumpToken(L18, opocde=158)
+                        LabelToken(L16, lineNumber=12)
+                        BlockToken(1)
+                        EndReplaceGroup()
+                        LabelToken(L18, lineNumber=11)
+                        BlockToken(3)
+                        JumpToken(L22, opocde=164)
+                        BlockToken(1)
+                        EndToMarkerToken(index=3)
+                        LabelToken(L22, lineNumber=12)
+                        BlockToken(25)
+                        EndReplaceGroup()
+                    }
+                }
+    
+                ReplaceGroup (group=ComposeGroupKey(key=-1254798623)) {
+                    StartReplaceGroup(key=ComposeGroupKey(key=-1254798623))
+                    BlockToken(1)
+                    EndReplaceGroup()
+                }
+            }
+        }
+    }
+}

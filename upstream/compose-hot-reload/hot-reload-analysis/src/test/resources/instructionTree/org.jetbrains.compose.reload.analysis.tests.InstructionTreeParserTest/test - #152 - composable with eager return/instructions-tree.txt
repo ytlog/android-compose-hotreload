@@ -1,0 +1,237 @@
+/* Code */
+import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+             
+@Composable
+fun Value(): String? {
+    return "value: 0"
+}
+
+@Composable
+fun Foo() {
+    val value = Value() ?: return
+    Column {
+        Text(value)
+    }
+}
+
+ /* Tree */ 
+class TestKt {
+    fun Foo$lambda$0 (ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit; {
+        Method (group=null) {
+            LabelToken(L0)
+            BlockToken(7)
+            ReturnToken(returnInsn=176)
+        }
+    }
+    
+    fun Foo$lambda$2 (ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit; {
+        Method (group=null) {
+            LabelToken(L0)
+            BlockToken(7)
+            ReturnToken(returnInsn=176)
+        }
+    }
+    
+    fun Foo (Landroidx/compose/runtime/Composer;I)V {
+        Method (group=ComposeGroupKey(key=-607362160)) {
+            LabelToken(L0, lineNumber=11)
+            BlockToken(1)
+            BlockToken(1)
+            JumpToken(L5, opocde=198)
+            BlockToken(3)
+            JumpToken(L6, opocde=167)
+            LabelToken(L5)
+            BlockToken(2)
+            LabelToken(L6, lineNumber=12)
+            BlockToken(1)
+            ReturnToken(returnInsn=177)
+            BlockToken(1)
+            JumpToken(L71, opocde=198)
+            BlockToken(3)
+            JumpToken(L72, opocde=167)
+            LabelToken(L71)
+            BlockToken(2)
+            LabelToken(L72)
+            BlockToken(1)
+            ReturnToken(returnInsn=177)
+    
+            RestartGroup (group=ComposeGroupKey(key=-607362160)) {
+                StartRestartGroup(key=ComposeGroupKey(key=-607362160))
+                BlockToken(3)
+                JumpToken(L1, opocde=153)
+                BlockToken(1)
+                JumpToken(L2, opocde=167)
+                LabelToken(L1)
+                BlockToken(2)
+                LabelToken(L2)
+                BlockToken(5)
+                JumpToken(L69, opocde=153)
+                BlockToken(1)
+                JumpToken(L3, opocde=153)
+                BlockToken(5)
+                LabelToken(L3, lineNumber=12)
+                BlockToken(5)
+                JumpToken(L7, opocde=199)
+                BlockToken(2)
+                JumpToken(L4, opocde=153)
+                BlockToken(1)
+                LabelToken(L4, lineNumber=16)
+                BlockToken(2)
+                EndRestartGroup()
+                LabelToken(L7)
+                BlockToken(2)
+                LabelToken(L8)
+                BlockToken(4)
+                LabelToken(L9, lineNumber=13)
+                BlockToken(1)
+                LabelToken(L10)
+                BlockToken(2)
+                LabelToken(L11)
+                BlockToken(1)
+                SourceInformationMarkerStart(key=ComposeGroupKey(key=1341605231), sourceInformation='CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo')
+                LabelToken(L13, lineNumber=18)
+                BlockToken(3)
+                LabelToken(L14, lineNumber=19)
+                BlockToken(3)
+                LabelToken(L15, lineNumber=20)
+                BlockToken(3)
+                LabelToken(L16, lineNumber=23)
+                BlockToken(16)
+                LabelToken(L17, lineNumber=27)
+                BlockToken(2)
+                LabelToken(L18, lineNumber=26)
+                BlockToken(10)
+                LabelToken(L19, lineNumber=24)
+                BlockToken(1)
+                LabelToken(L20)
+                BlockToken(2)
+                LabelToken(L21)
+                BlockToken(1)
+                SourceInformationMarkerStart(key=ComposeGroupKey(key=-1159599143), sourceInformation='CC(Layout)N(content,modifier,measurePolicy)81@3355L27,84@3521L415:Layout.kt#80mrfh')
+                LabelToken(L23, lineNumber=29)
+                BlockToken(5)
+                LabelToken(L24)
+                BlockToken(1)
+                LabelToken(L25, lineNumber=30)
+                BlockToken(2)
+                LabelToken(L26)
+                BlockToken(1)
+                LabelToken(L27, lineNumber=31)
+                BlockToken(3)
+                LabelToken(L28, lineNumber=33)
+                BlockToken(13)
+                LabelToken(L29, lineNumber=32)
+                BlockToken(1)
+                LabelToken(L30)
+                BlockToken(2)
+                LabelToken(L31)
+                BlockToken(1)
+                SourceInformationMarkerStart(key=ComposeGroupKey(key=-553112988), sourceInformation='CC(ReusableComposeNode)N(factory,update,content)410@16187L9:Composables.kt#9igjgp')
+                LabelToken(L33, lineNumber=35)
+                BlockToken(3)
+                JumpToken(L34, opocde=154)
+                BlockToken(1)
+                LabelToken(L34)
+                BlockToken(2)
+                LabelToken(L35, lineNumber=36)
+                BlockToken(1)
+                LabelToken(L36, lineNumber=37)
+                BlockToken(2)
+                JumpToken(L38, opocde=153)
+                BlockToken(1)
+                LabelToken(L37, lineNumber=38)
+                BlockToken(2)
+                JumpToken(L40, opocde=167)
+                LabelToken(L38)
+                BlockToken(2)
+                LabelToken(L39, lineNumber=40)
+                BlockToken(1)
+                LabelToken(L40, lineNumber=42)
+                BlockToken(4)
+                LabelToken(L41)
+                BlockToken(2)
+                LabelToken(L42, lineNumber=43)
+                BlockToken(5)
+                LabelToken(L43, lineNumber=44)
+                BlockToken(5)
+                LabelToken(L44, lineNumber=45)
+                BlockToken(6)
+                LabelToken(L45, lineNumber=46)
+                BlockToken(4)
+                LabelToken(L46, lineNumber=47)
+                BlockToken(5)
+                LabelToken(L47, lineNumber=48)
+                BlockToken(1)
+                LabelToken(L48, lineNumber=42)
+                BlockToken(1)
+                LabelToken(L49, lineNumber=49)
+                BlockToken(8)
+                LabelToken(L50)
+                BlockToken(2)
+                LabelToken(L51)
+                BlockToken(1)
+                SourceInformationMarkerStart(key=ComposeGroupKey(key=2093002350), sourceInformation='C89@4557L9:Column.kt#2w3rfo')
+                BlockToken(13)
+                LabelToken(L53)
+                BlockToken(2)
+                LabelToken(L54, lineNumber=14)
+                BlockToken(23)
+                LabelToken(L55, lineNumber=15)
+                BlockToken(1)
+                LabelToken(L56, lineNumber=25)
+                BlockToken(1)
+                SourceInformationMarkerEnd
+                LabelToken(L57, lineNumber=49)
+                BlockToken(1)
+                LabelToken(L58, lineNumber=50)
+                BlockToken(2)
+                LabelToken(L59, lineNumber=34)
+                SourceInformationMarkerEnd
+                LabelToken(L60, lineNumber=51)
+                BlockToken(1)
+                LabelToken(L61)
+                BlockToken(1)
+                LabelToken(L62, lineNumber=28)
+                SourceInformationMarkerEnd
+                LabelToken(L63, lineNumber=52)
+                BlockToken(1)
+                LabelToken(L64)
+                BlockToken(1)
+                LabelToken(L65, lineNumber=17)
+                SourceInformationMarkerEnd
+                LabelToken(L66, lineNumber=53)
+                BlockToken(1)
+                LabelToken(L67)
+                BlockToken(1)
+                JumpToken(L70, opocde=153)
+                BlockToken(1)
+                LabelToken(L68)
+                JumpToken(L70, opocde=167)
+                LabelToken(L69, lineNumber=11)
+                BlockToken(3)
+                LabelToken(L70, lineNumber=16)
+                BlockToken(2)
+                EndRestartGroup()
+            }
+        }
+    }
+    
+    fun Value (Landroidx/compose/runtime/Composer;I)Ljava/lang/String; {
+        Method (group=ComposeGroupKey(key=-1250970360)) {
+            LabelToken(L0)
+            BlockToken(1)
+            JumpToken(L1, opocde=153)
+            BlockToken(5)
+            LabelToken(L1)
+            BlockToken(2)
+            JumpToken(L2, opocde=153)
+            BlockToken(1)
+            LabelToken(L2)
+            BlockToken(2)
+            LabelToken(L3, lineNumber=7)
+            ReturnToken(returnInsn=176)
+        }
+    }
+}

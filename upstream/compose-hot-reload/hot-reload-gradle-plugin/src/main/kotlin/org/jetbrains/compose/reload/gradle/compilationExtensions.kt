@@ -1,0 +1,87 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+package org.jetbrains.compose.reload.gradle
+
+import org.gradle.api.file.Directory
+import org.gradle.api.file.RegularFile
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Provider
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
+import org.jetbrains.compose.reload.InternalHotReloadApi
+import org.jetbrains.compose.reload.core.PidFileInfo
+import org.jetbrains.compose.reload.core.getOrThrow
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation.Companion.MAIN_COMPILATION_NAME
+import kotlin.io.path.isRegularFile
+
+internal val KotlinCompilation<*>.runBuildDirectory: Provider<Directory>
+    get() = project.layout.buildDirectory.dir("run/${camelCase(target.name, compilationName)}")
+
+internal fun KotlinCompilation<*>.runBuildDirectory(path: String): Provider<Directory> {
+    return runBuildDirectory.map { directory -> directory.dir(path) }
+}
+
+internal fun KotlinCompilation<*>.runBuildFile(path: String): Provider<RegularFile> {
+    return runBuildDirectory.map { directory -> directory.file(path) }
+}
+
+internal val KotlinCompilation<*>.pidFileOrchestrationPort: Provider<Int>
+    get() = project.providers.of(PidFileOrchestrationPort::class.java) { spec ->
+        spec.parameters { params ->
+            params.pidFile.set(pidFile)
+        }
+    }
+
+internal abstract class PidFileOrchestrationPort : ValueSource<Int, PidFileOrchestrationPort.Params> {
+    interface Params : ValueSourceParameters {
+        val pidFile: RegularFileProperty
+    }
+
+    override fun obtain(): Int? {
+        val pidFile = parameters.pidFile.asFile.orNull?.toPath() ?: return null
+        if (pidFile.isRegularFile()) {
+            return PidFileInfo(pidFile).getOrThrow().orchestrationPort
+        }
+
+        return null
+    }
+}
+
+/**
+ * Represents the directory where 'hot' classes will be put for the running application
+ * to load them from.
+ */
+internal val KotlinCompilation<*>.hotClassesOutputDirectory
+    get() = runBuildDirectory("classpath/hot")
+
+/**
+ * The associated file containing the runtime-classpath snapshot used by the [org.jetbrains.compose.reload.ComposeHotReloadTask]
+ */
+internal val KotlinCompilation<*>.hotClasspathSnapshotFile
+    get() = runBuildDirectory("classpath").map { it.file(".snapshot") }
+
+internal val KotlinCompilation<*>.hotReloadRequestFile
+    get() = runBuildDirectory("classpath").map { it.file(".request") }
+
+@InternalHotReloadApi
+val KotlinCompilation<*>.pidFile
+    get() = runBuildFile("${camelCase(target.name, name)}.pid")
+
+internal val KotlinCompilation<*>.argFile
+    get() = runBuildFile("${camelCase(target.name, name)}.argfile")
+
+internal val KotlinCompilation<*>.hotRunTaskName
+    get() = camelCase("hot", "run", target.name, compilationName.takeIf { it != MAIN_COMPILATION_NAME })
+
+internal val KotlinCompilation<*>.hotDevTaskName
+    get() = camelCase("hot", "dev", target.name, compilationName.takeIf { it != "dev" })
+
+internal val KotlinCompilation<*>.hotReloadTaskName
+    get() = camelCase("hot", "reload", target.name, compilationName)
+
+internal val KotlinCompilation<*>.hotSnapshotTaskName
+    get() = camelCase("hot", "snapshot", target.name, compilationName)

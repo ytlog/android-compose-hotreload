@@ -1,0 +1,3 @@
+public abstract interface annotation class org/jetbrains/compose/reload/test/core/InternalHotReloadTestApi : java/lang/annotation/Annotation {
+}
+

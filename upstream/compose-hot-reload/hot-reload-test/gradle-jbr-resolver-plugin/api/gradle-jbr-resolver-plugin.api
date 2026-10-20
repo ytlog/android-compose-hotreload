@@ -1,0 +1,18 @@
+public abstract class org/jetbrains/compose/reload/test/JbrResolverConventionPlugin : org/gradle/api/Plugin {
+	public fun <init> ()V
+	public synthetic fun apply (Ljava/lang/Object;)V
+	public fun apply (Lorg/gradle/api/initialization/Settings;)V
+}
+
+public abstract class org/jetbrains/compose/reload/test/JbrResolverImpl : org/gradle/jvm/toolchain/JavaToolchainResolver {
+	public fun <init> ()V
+	public fun resolve (Lorg/gradle/jvm/toolchain/JavaToolchainRequest;)Ljava/util/Optional;
+}
+
+public abstract class org/jetbrains/compose/reload/test/JbrResolverPlugin : org/gradle/api/Plugin {
+	public fun <init> ()V
+	public synthetic fun apply (Ljava/lang/Object;)V
+	public fun apply (Lorg/gradle/api/initialization/Settings;)V
+	protected abstract fun getToolchainResolverRegistry ()Lorg/gradle/jvm/toolchain/JavaToolchainResolverRegistry;
+}
+

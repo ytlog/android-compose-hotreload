@@ -1,0 +1,354 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
+package org.jetbrains.compose.reload.jvm
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toAwtImage
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.use
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.yield
+import org.jetbrains.compose.devtools.api.VirtualTimeState
+import org.jetbrains.compose.reload.InternalHotReloadApi
+import org.jetbrains.compose.reload.agent.orchestration
+import org.jetbrains.compose.reload.agent.sendAsync
+import org.jetbrains.compose.reload.core.asTemplateOrThrow
+import org.jetbrains.compose.reload.core.createLogger
+import org.jetbrains.compose.reload.core.debug
+import org.jetbrains.compose.reload.core.error
+import org.jetbrains.compose.reload.core.info
+import org.jetbrains.compose.reload.core.renderOrThrow
+import org.jetbrains.compose.reload.core.warn
+import org.jetbrains.compose.reload.orchestration.OrchestrationClientRole
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessage
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.ShutdownRequest
+import org.jetbrains.compose.reload.orchestration.asChannel
+import java.io.ByteArrayOutputStream
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.concurrent.TimeoutException
+import javax.imageio.ImageIO
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
+
+private val logger = createLogger()
+
+internal data class SilenceTimeout(val timeout: Duration) : CoroutineContext.Element {
+    override val key: CoroutineContext.Key<*> = Key
+
+    companion object Key : CoroutineContext.Key<SilenceTimeout>
+}
+
+@OptIn(ExperimentalTime::class)
+public suspend fun runHeadlessApplication(
+    timeout: Duration, width: Int, height: Int,
+    content: @Composable () -> Unit
+): Unit = coroutineScope {
+    val applicationScope = this
+    val messages = orchestration.asChannel()
+
+    val sceneSize = computeSceneSize(width, height, content)
+    val scene = ImageComposeScene(
+        sceneSize.width, sceneSize.height, coroutineContext = applicationScope.coroutineContext
+    )
+    scene.setContent {
+        Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+            DevelopmentEntryPoint { content() }
+        }
+    }
+
+    applicationScope.launch {
+        delay(timeout)
+        logger.error("Application timed out...")
+        applicationScope.cancel("Application timed out...")
+    }
+
+    /* Main loop */
+    applicationScope.launch {
+        /*
+        The virtual time can also be provided as orchestration state.
+        The virtual time from such state has precedence and always be used
+         */
+        val virtualTimeState = orchestration.states.get(VirtualTimeState)
+
+        /*
+        The actual current virtual time.
+        If the virtual time is provided by the orchestration, then this time will be used.
+        Otherwise, the virtual time will automatically advance
+         */
+        var virtualTime = virtualTimeState.value?.time?.inWholeNanoseconds ?: 0
+        val virtualFrameDuration = 256.milliseconds
+
+        val lastMessageBufferSize = 48
+        val lastMessagesBuffer = ArrayDeque<OrchestrationMessage>(48)
+        var previousMessageClockTime: Instant? = null
+        var previousSilenceWarningSystemClockTime = Clock.System.now()
+        var silenceDuration = Duration.ZERO
+
+        while (isActive) {
+            virtualTime = virtualTimeState.value?.time?.inWholeNanoseconds
+                ?: (virtualTime + virtualFrameDuration.inWholeNanoseconds)
+
+            if (scene.hasInvalidations()) {
+                scene.render(virtualTime)
+
+                /*
+                The 'continue' below requires us to yield the current thread before entering the loop again
+                to prevent thread starvation.
+                 */
+                yield()
+
+                /*
+                If we still have invalidations after the render + yield,
+                then we can throttle the loop
+                 */
+                if (scene.hasInvalidations()) {
+                    logger.info("Throttling render loop at ${virtualTime.nanoseconds}")
+                    delay(32.milliseconds)
+                }
+
+                /*
+                If there is no virtual time provided by the orchestration, then we assume that invalidations
+                are inconsistent states, and we shall advance time until we end up in a stable consistent state again.
+                */
+                if (virtualTimeState.value == null) {
+                    continue
+                }
+            }
+
+            val message = select {
+                messages.onReceive { it }
+                onTimeout(virtualFrameDuration) { null }
+            }
+
+            if (message == null || message.isSilenceWarning()) {
+                silenceDuration += virtualFrameDuration
+
+                val timeout = currentCoroutineContext()[SilenceTimeout]
+                val previousWarningDuration = Clock.System.now() - previousSilenceWarningSystemClockTime
+
+                if (timeout != null && silenceDuration >= timeout.timeout) {
+                    val currentTime = Clock.System.now()
+                        .toJavaInstant().atZone(ZoneId.systemDefault())
+                        .format(DateTimeFormatter.ISO_TIME)
+
+                    val previousMessageTime = previousMessageClockTime
+                        ?.toJavaInstant()?.atZone(ZoneId.systemDefault())
+                        ?.format(DateTimeFormatter.ISO_TIME) ?: "N/A"
+
+
+                    throw TimeoutException(
+                        """
+                           🚨🔇⏰ Silence Timeout
+                           
+                           No messages received for: $silenceDuration
+                           Current Time: $currentTime
+                           Previous Message Time: $previousMessageTime
+                           Last Messages: (${lastMessagesBuffer.size}):
+                               - {{message}}
+                       """.trimIndent().asTemplateOrThrow()
+                            .renderOrThrow {
+                                lastMessagesBuffer.forEach { message ->
+                                    "message"(message.toString())
+                                }
+                            }
+                    )
+                }
+
+                if (silenceDuration > 5.seconds && previousWarningDuration > 5.seconds) {
+                    issueSilenceWarning(silenceDuration, timeout)
+                    previousSilenceWarningSystemClockTime = Clock.System.now()
+                }
+
+                continue
+            }
+
+            if (lastMessagesBuffer.size >= lastMessageBufferSize) {
+                lastMessagesBuffer.removeFirstOrNull()
+            }
+
+            lastMessagesBuffer.addLast(message)
+
+            silenceDuration = Duration.ZERO
+            previousMessageClockTime = Clock.System.now()
+
+            if (message is ShutdownRequest && message.isApplicable()) {
+                applicationScope.coroutineContext.job.cancelChildren()
+                return@launch
+            }
+
+            if (message !is OrchestrationMessage.Ack && message !is OrchestrationMessage.LogMessage) {
+                if (message is OrchestrationMessage.Ping) {
+                    logger.info("Responding to ping '${message.messageId}'")
+                }
+
+                orchestration.send(OrchestrationMessage.Ack(message.messageId))
+            }
+
+            /* Break out for TestEvents and give the main thread time to handle that */
+            if (message is OrchestrationMessage.TestEvent) {
+                yield()
+            }
+
+            if (message is OrchestrationMessage.TakeScreenshotRequest) {
+                logger.info("Taking screenshot: '${message.messageId}'")
+                val baos = ByteArrayOutputStream()
+                ImageIO.write(scene.render(virtualTime).toComposeImageBitmap().toAwtImage(), "png", baos)
+                orchestration.send(OrchestrationMessage.Screenshot("png", baos.toByteArray()))
+                logger.debug("Sent screenshot: '${message.messageId}'")
+            }
+
+            if (message is OrchestrationMessage.ScreenshotRequest) {
+                logger.info("Taking screenshot: '${message.messageId}'")
+                try {
+                    val baos = ByteArrayOutputStream()
+                    ImageIO.write(scene.render(virtualTime).toComposeImageBitmap().toAwtImage(), "png", baos)
+                    orchestration.send(
+                        OrchestrationMessage.ScreenshotResult(
+                            screenshotRequestId = message.messageId,
+                            format = "png",
+                            data = baos.toByteArray()
+                        )
+                    )
+                    logger.debug("Sent screenshot: '${message.messageId}'")
+                } catch (e: Exception) {
+                    logger.warn("Screenshot failed: ${e.message}")
+                    orchestration.send(
+                        OrchestrationMessage.ScreenshotResult(
+                            screenshotRequestId = message.messageId,
+                            isSuccess = false,
+                            errorMessage = "Headless screenshot failed: ${e.message}"
+                        )
+                    )
+                }
+            }
+
+            if (message is OrchestrationMessage.SemanticTreeRequest) {
+                logger.info("Capturing semantic tree: '${message.messageId}'")
+                scene.render(virtualTime)
+                orchestration.send(
+                    OrchestrationMessage.SemanticTreeResult(
+                        semanticTreeRequestId = message.messageId,
+                        tree = renderSemanticForest(scene.allRootSemanticsNodes()),
+                    )
+                )
+            }
+
+            if (message is OrchestrationMessage.UIActionRequest) {
+                scene.render(virtualTime)
+                orchestration.send(handleUIActionRequest(message, scene.allRootSemanticsNodes()))
+            }
+        }
+
+    }
+}
+
+/**
+ * Runs a 'headless' compose application which will participate in the orchestration.
+ * This method will block until the application is finished.
+ */
+@InternalHotReloadApi
+public fun runHeadlessApplicationBlocking(
+    timeout: Duration,
+    silenceTimeout: Duration? = null,
+    width: Int, height: Int,
+    content: @Composable () -> Unit
+) {
+    runBlocking(
+        Dispatchers.Main + Job() + CoroutineName("HeadlessApplication") +
+            (if (silenceTimeout != null) SilenceTimeout(silenceTimeout) else EmptyCoroutineContext) +
+            CoroutineExceptionHandler { _, throwable ->
+                OrchestrationMessage.CriticalException(
+                    clientRole = OrchestrationClientRole.Application,
+                    message = throwable.message,
+                    exceptionClassName = throwable::class.qualifiedName,
+                    stacktrace = throwable.stackTrace.toList()
+                ).sendAsync()
+            }) {
+
+        runHeadlessApplication(timeout, width, height, content)
+    }
+}
+
+/**
+ * Assumes there are no animations that increase in size
+ */
+private fun computeSceneSize(
+    width: Int, height: Int, content: @Composable () -> Unit
+): IntSize {
+    if (width > 0 && height > 0) return IntSize(width, height)
+
+    var measuredSize: IntSize? = null
+    // big enough scene to fit everything
+    ImageComposeScene(4096, 4096).use { scene ->
+        scene.setContent {
+            Box(modifier = Modifier.onSizeChanged { measuredSize = it }) {
+                DevelopmentEntryPoint { content() }
+            }
+        }
+        scene.render(0)
+    }
+
+    val finalWidth = when {
+        width > 0 -> width
+        else -> measuredSize?.width?.coerceAtLeast(1) ?: 512
+    }
+    val finalHeight = when {
+        height > 0 -> height
+        else -> measuredSize?.height?.coerceAtLeast(1) ?: 512
+    }
+    return IntSize(finalWidth, finalHeight)
+}
+
+private fun OrchestrationMessage.isSilenceWarning() = this is OrchestrationMessage.LogMessage &&
+    message.contains("No messages received for ")
+
+private fun issueSilenceWarning(silence: Duration, silenceTimeout: SilenceTimeout?) {
+    logger.warn("No messages received for '$silence' (timeout '${silenceTimeout?.timeout}')")
+}
+
+/**
+ * Extracts every root [SemanticsNode] from an [ImageComposeScene]: a main owner plus one owner per
+ * attached layer (Dialog / ModalBottomSheet / Popup), each carrying its own semantics root.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+private fun ImageComposeScene.allRootSemanticsNodes(): List<SemanticsNode> =
+    semanticsOwners.map { it.rootSemanticsNode }

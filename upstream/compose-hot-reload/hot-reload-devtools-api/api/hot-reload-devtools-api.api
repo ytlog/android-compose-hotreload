@@ -1,0 +1,264 @@
+public final class org/jetbrains/compose/devtools/api/BuildModeState : org/jetbrains/compose/reload/orchestration/OrchestrationState {
+	public static final field $stable I
+	public static final field Key Lorg/jetbrains/compose/devtools/api/BuildModeState$Key;
+	public fun <init> ()V
+	public fun <init> (Z)V
+	public synthetic fun <init> (ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun isContinuous ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/BuildModeState$Key : org/jetbrains/compose/reload/orchestration/OrchestrationStateKey {
+	public fun getDefault ()Lorg/jetbrains/compose/devtools/api/BuildModeState;
+	public synthetic fun getDefault ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationState;
+	public fun getId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationStateId;
+}
+
+public abstract interface class org/jetbrains/compose/devtools/api/Recompiler {
+	public abstract fun buildAndReload-lno2V2A (Lorg/jetbrains/compose/devtools/api/RecompilerContext;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getName ()Ljava/lang/String;
+}
+
+public abstract interface class org/jetbrains/compose/devtools/api/RecompilerContext {
+	public abstract fun getLogger ()Lorg/jetbrains/compose/reload/core/Logger;
+	public abstract fun getOrchestration ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationHandle;
+	public abstract fun getRequests ()Ljava/util/List;
+	public abstract fun invokeOnDispose (Lkotlin/jvm/functions/Function0;)Lorg/jetbrains/compose/reload/core/Disposable;
+	public abstract fun process (Lkotlin/jvm/functions/Function1;)Ljava/lang/ProcessBuilder;
+}
+
+public final class org/jetbrains/compose/devtools/api/RecompilerContext$DefaultImpls {
+	public static synthetic fun process$default (Lorg/jetbrains/compose/devtools/api/RecompilerContext;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/ProcessBuilder;
+}
+
+public abstract interface class org/jetbrains/compose/devtools/api/RecompilerExtension {
+	public abstract fun createRecompiler ()Lorg/jetbrains/compose/devtools/api/Recompiler;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadAnimationSpec {
+	public static final field $stable I
+	public static final field INSTANCE Lorg/jetbrains/compose/devtools/api/ReloadAnimationSpec;
+	public final fun getOkStatusRetention-UwyO8pc ()J
+	public final fun getStatusColorFadeDuration-UwyO8pc ()J
+	public final fun getStatusFadeoutDuration-UwyO8pc ()J
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadColors {
+	public static final field $stable I
+	public static final field INSTANCE Lorg/jetbrains/compose/devtools/api/ReloadColors;
+	public final fun getError-0d7_KjU ()J
+	public final fun getOk-0d7_KjU ()J
+	public final fun getOkDarker-0d7_KjU ()J
+	public final fun getReloading-0d7_KjU ()J
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadCountState : org/jetbrains/compose/reload/orchestration/OrchestrationState {
+	public static final field $stable I
+	public static final field Key Lorg/jetbrains/compose/devtools/api/ReloadCountState$Key;
+	public fun <init> ()V
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailedReloads ()I
+	public final fun getSuccessfulReloads ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadCountState$Key : org/jetbrains/compose/reload/orchestration/OrchestrationStateKey {
+	public fun getDefault ()Lorg/jetbrains/compose/devtools/api/ReloadCountState;
+	public synthetic fun getDefault ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationState;
+	public fun getId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationStateId;
+}
+
+public abstract interface class org/jetbrains/compose/devtools/api/ReloadEffect {
+	public abstract fun ordinal-GS5S1oA (Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+	public abstract fun priority-rdc1y9s (Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$DefaultImpls {
+	public static fun ordinal-GS5S1oA (Lorg/jetbrains/compose/devtools/api/ReloadEffect;Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+	public static fun priority-rdc1y9s (Lorg/jetbrains/compose/devtools/api/ReloadEffect;Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+}
+
+public abstract interface class org/jetbrains/compose/devtools/api/ReloadEffect$ModifierEffect : org/jetbrains/compose/devtools/api/ReloadEffect {
+	public abstract fun effectModifier (Lorg/jetbrains/compose/devtools/api/ReloadState;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/Modifier;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$ModifierEffect$DefaultImpls {
+	public static fun ordinal-GS5S1oA (Lorg/jetbrains/compose/devtools/api/ReloadEffect$ModifierEffect;Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+	public static fun priority-rdc1y9s (Lorg/jetbrains/compose/devtools/api/ReloadEffect$ModifierEffect;Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$Ordinal : java/lang/Comparable {
+	public static final field Companion Lorg/jetbrains/compose/devtools/api/ReloadEffect$Ordinal$Companion;
+	public static final synthetic fun box-impl (I)Lorg/jetbrains/compose/devtools/api/ReloadEffect$Ordinal;
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo-AoXYLh8 (I)I
+	public static fun compareTo-AoXYLh8 (II)I
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public static final fun minus-GS5S1oA (II)I
+	public static final fun plus-GS5S1oA (II)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$Ordinal$Companion {
+	public final fun getFirst-OYP87N4 ()I
+	public final fun getLast-OYP87N4 ()I
+	public final fun getMedium-OYP87N4 ()I
+}
+
+public abstract interface class org/jetbrains/compose/devtools/api/ReloadEffect$OverlayEffect : org/jetbrains/compose/devtools/api/ReloadEffect {
+	public abstract fun effectOverlay (Lorg/jetbrains/compose/devtools/api/ReloadState;Landroidx/compose/runtime/Composer;I)V
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$OverlayEffect$DefaultImpls {
+	public static fun ordinal-GS5S1oA (Lorg/jetbrains/compose/devtools/api/ReloadEffect$OverlayEffect;Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+	public static fun priority-rdc1y9s (Lorg/jetbrains/compose/devtools/api/ReloadEffect$OverlayEffect;Lorg/jetbrains/compose/devtools/api/ReloadState;)I
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$Priority : java/lang/Comparable {
+	public static final field Companion Lorg/jetbrains/compose/devtools/api/ReloadEffect$Priority$Companion;
+	public static final synthetic fun box-impl (I)Lorg/jetbrains/compose/devtools/api/ReloadEffect$Priority;
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo-ybNDtkY (I)I
+	public static fun compareTo-ybNDtkY (II)I
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadEffect$Priority$Companion {
+	public final fun getHigh-bug0MfQ ()I
+	public final fun getNormal-bug0MfQ ()I
+}
+
+public abstract class org/jetbrains/compose/devtools/api/ReloadState : org/jetbrains/compose/reload/orchestration/OrchestrationState {
+	public static final field $stable I
+	public static final field Key Lorg/jetbrains/compose/devtools/api/ReloadState$Key;
+	public abstract fun getTime ()Lkotlin/time/Instant;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadState$Failed : org/jetbrains/compose/devtools/api/ReloadState {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Lkotlin/time/Instant;Ljava/lang/String;)V
+	public fun <init> (Lkotlin/time/Instant;Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Lkotlin/time/Instant;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetails ()Ljava/util/List;
+	public final fun getReason ()Ljava/lang/String;
+	public fun getTime ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadState$Key : org/jetbrains/compose/reload/orchestration/OrchestrationStateKey {
+	public fun getDefault ()Lorg/jetbrains/compose/devtools/api/ReloadState;
+	public synthetic fun getDefault ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationState;
+	public fun getId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationStateId;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadState$Ok : org/jetbrains/compose/devtools/api/ReloadState {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lkotlin/time/Instant;)V
+	public synthetic fun <init> (Lkotlin/time/Instant;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getTime ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/ReloadState$Reloading : org/jetbrains/compose/devtools/api/ReloadState {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lkotlin/time/Instant;Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessageId;)V
+	public synthetic fun <init> (Lkotlin/time/Instant;Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessageId;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun copy (Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessageId;)Lorg/jetbrains/compose/devtools/api/ReloadState$Reloading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReloadRequestId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessageId;
+	public fun getTime ()Lkotlin/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/UIErrorState : org/jetbrains/compose/reload/orchestration/OrchestrationState {
+	public static final field $stable I
+	public static final field Key Lorg/jetbrains/compose/devtools/api/UIErrorState$Key;
+	public fun <init> (Ljava/util/Map;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getErrors ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/UIErrorState$Key : org/jetbrains/compose/reload/orchestration/OrchestrationStateKey {
+	public fun getDefault ()Lorg/jetbrains/compose/devtools/api/UIErrorState;
+	public synthetic fun getDefault ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationState;
+	public fun getId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationStateId;
+}
+
+public final class org/jetbrains/compose/devtools/api/UIErrorState$UIError {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getStacktrace ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/VirtualTimeState$Key : org/jetbrains/compose/reload/orchestration/OrchestrationStateKey {
+	public fun getDefault ()Lorg/jetbrains/compose/devtools/api/VirtualTimeState;
+	public synthetic fun getDefault ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationState;
+	public fun getId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationStateId;
+}
+
+public final class org/jetbrains/compose/devtools/api/WindowsState : org/jetbrains/compose/reload/orchestration/OrchestrationState {
+	public static final field $stable I
+	public static final field Key Lorg/jetbrains/compose/devtools/api/WindowsState$Key;
+	public fun <init> (Ljava/util/Map;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getWindows ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/devtools/api/WindowsState$Key : org/jetbrains/compose/reload/orchestration/OrchestrationStateKey {
+	public fun getDefault ()Lorg/jetbrains/compose/devtools/api/WindowsState;
+	public synthetic fun getDefault ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationState;
+	public fun getId ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationStateId;
+}
+
+public final class org/jetbrains/compose/devtools/api/WindowsState$WindowState {
+	public static final field $stable I
+	public fun <init> (IIIIZ)V
+	public fun <init> (IIIIZLjava/lang/String;)V
+	public synthetic fun <init> (IIIIZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeight ()I
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getWidth ()I
+	public final fun getX ()I
+	public final fun getY ()I
+	public fun hashCode ()I
+	public final fun isAlwaysOnTop ()Z
+	public fun toString ()Ljava/lang/String;
+}
+

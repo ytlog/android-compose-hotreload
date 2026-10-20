@@ -1,0 +1,10 @@
+.gradle
+.kotlin
+.idea/
+.run/
+**/build
+**/.cxx
+**/.DS_Store
+**/__pycache__
+*.pyc
+local.properties
