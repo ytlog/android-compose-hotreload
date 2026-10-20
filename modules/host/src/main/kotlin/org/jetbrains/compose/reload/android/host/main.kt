@@ -3,6 +3,7 @@
 package org.jetbrains.compose.reload.android.host
 
 import org.jetbrains.compose.reload.android.host.session.ApplicationIndex
+import org.jetbrains.compose.reload.android.host.session.ResourceIndex
 import org.jetbrains.compose.reload.android.host.device.Device
 import org.jetbrains.compose.reload.android.host.upstream.UpstreamTooling
 import org.jetbrains.compose.reload.android.host.upstream.launchReloadRequestHandler
@@ -29,6 +30,7 @@ fun main() {
 
     val adb = Adb(config.adb, config.serial)
     val index = ApplicationIndex(config.applicationClasspath, config.bootClasspath)
+    val resources = ResourceIndex(config.resourceBundle)
     val dexer = Dexer(config.minSdk, config.bootClasspath, config.applicationClasspath)
     val device = Device.launch(adb, config.applicationId)
     device.hello.runtimeError?.let { error ->
@@ -42,7 +44,7 @@ fun main() {
     })
 
     UpstreamTooling.attach(device)
-    launchReloadRequestHandler(index, dexer, device)
+    launchReloadRequestHandler(index, dexer, device, resources)
 
     device.closed.get()
     logger.info("Application '${config.applicationId}' (pid ${device.hello.pid}) exited")

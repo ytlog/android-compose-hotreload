@@ -1,11 +1,11 @@
 package org.jetbrains.compose.reload.android.gradle
 
 import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.instrumentation.FramesComputationMode
 import com.android.build.api.instrumentation.InstrumentationScope
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.api.variant.ApplicationVariant
-import org.jetbrains.compose.reload.android.gradle.upstream.devToolsEnabled
 import org.jetbrains.compose.reload.android.gradle.upstream.registerUpstreamReloadTasks
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -75,20 +75,28 @@ private fun Project.configureVariant(
     val runDirectory = layout.buildDirectory.dir("run/${variant.name}")
     val pidFile = runDirectory.map { it.file("${variant.name}.pid") }
 
-    /* upstream 'WindowInstrumentation': install the 'DevelopmentEntryPoint' into 'androidx.activity.compose.setContent' */
-    if (devToolsEnabled) {
-        variant.instrumentation.transformClassesWith(
-            EntryPointInstrumentation::class.java, InstrumentationScope.ALL
-        ) { }
-        variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COPY_FRAMES)
-    }
+    /* Resource invalidation needs the entry point even when the devtools window is disabled. */
+    variant.instrumentation.transformClassesWith(
+        EntryPointInstrumentation::class.java, InstrumentationScope.ALL
+    ) { }
+    variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COPY_FRAMES)
 
     val hotFiles = hotClasspath(variant)
     val coldFiles = coldClasspath(variant)
 
-    val upstreamTasks = registerUpstreamReloadTasks(name, variant.name, runDirectory, pidFile, hotFiles, reloadLifecycleTask)
+    val resourceSnapshot = tasks.register("hotResources$name", AndroidResourceSnapshot::class.java) { task ->
+        task.apkDirectory.set(variant.artifacts.get(SingleArtifact.APK))
+        task.artifactsLoader = variant.artifacts.getBuiltArtifactsLoader()
+        task.aapt2.set(components.sdkComponents.aapt2.flatMap { it.executable })
+        task.outputDirectory.set(runDirectory.map { it.dir("resources") })
+    }
+    val resources = resourceSnapshot.flatMap { it.outputDirectory }
+    val upstreamTasks = registerUpstreamReloadTasks(
+        name, variant.name, runDirectory, pidFile, files(hotFiles, resources), reloadLifecycleTask
+    )
 
-    registerHotRunTask(variant, components, name, pidFile, upstreamTasks.reload, upstreamTasks.snapshot, hotFiles, coldFiles)
+    registerHotRunTask(variant, components, name, pidFile, upstreamTasks.reload, upstreamTasks.snapshot,
+        hotFiles, coldFiles, resources.map { it.file(RESOURCE_BUNDLE) })
 }
 
 /**

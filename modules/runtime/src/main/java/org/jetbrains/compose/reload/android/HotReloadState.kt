@@ -10,6 +10,7 @@ internal data class HotReloadState(
     val iteration: Int,
     val reloadError: Throwable? = null,
     val key: Int = 0,
+    val resourceVersion: Int = 0,
 )
 
 internal val hotReloadStateLocal = compositionLocalOf<HotReloadState?> { null }
@@ -17,12 +18,13 @@ internal val hotReloadStateLocal = compositionLocalOf<HotReloadState?> { null }
 internal val hotReloadState: MutableStateFlow<HotReloadState> = MutableStateFlow(HotReloadState(null, 0))
 
 /** upstream: 'invokeAfterHotReload' listener of 'hotReloadState' */
-internal fun onHotReload(reloadRequestId: String, error: Throwable?) {
+internal fun onHotReload(reloadRequestId: String, error: Throwable?, resourcesChanged: Boolean = false) {
     hotReloadState.update { state ->
         state.copy(
             reloadRequestId = reloadRequestId,
             iteration = state.iteration + 1,
             reloadError = error,
+            resourceVersion = state.resourceVersion + if (resourcesChanged) 1 else 0,
         )
     }
 }

@@ -197,9 +197,42 @@ Kotlin 2.2+ 会在内联函数局部变量名后附加行号（例如 `$i$a$-cac
 
 新增类追加 DEX、类加载器缓存，以及已初始化接口不重跑初始化等进程副作用不能由拒绝事务完全撤销。原子性针对已有类定义，不能承诺恢复新增 DEX、任意用户副作用或原始 offset 缓存。
 
-- Android 资源、manifest 的热替换（需要重新安装）。
+- Manifest、资源名称/ID 变化，以及删除已安装资源文件或限定配置，需要重新安装；资源内容更新见下文。
 - 多进程应用、minified variants。
 - devtools 中依赖窗口的功能：截图、语义树、UI 操作、窗口尺寸。
 - `ReloadEffects` 叠加效果。
 - 上游 `hot-reload-runtime-api` 已经发布了 Android 变体，但运行时还没有接上它的 `AfterHotReloadEffect` / `invokeAfterHotReload` 钩子。
 - 尚未接入 IDE 插件的 Android 运行配置。
+
+## 资源更新
+
+无需额外配置，和代码使用相同的任务：
+
+```bash
+# 首次启动或修改不支持的内容后重新安装
+./gradlew :app:hotRunDebug --auto
+# 已启动且未启用自动模式时，修改资源后手动重载
+./gradlew :app:reload
+```
+
+支持修改已有字符串、颜色、尺寸等 values，替换已有 drawable、raw 和 assets 文件内容；应用与本地 library 的资源均由 AGP 合并。Compose 的 `stringResource`、`colorResource`、`painterResource` 和通过当前 Context 重新读取的资源，会在更新后刷新。代码和资源可以一起修改，不需要重新安装或重启进程，普通 `remember` 状态保留。`--auto` 同样监听资源和 assets 输入。
+
+当前范围与限制：
+
+- 资源名称和 ID 必须与本次 `hotRun` 安装时一致。新增、删除、重命名资源，或构建导致 ID 变化，会拒绝本次重载并提示重新安装。
+- 不能删除已安装的资源文件、assets 文件或 values 限定配置，否则 Android 的覆盖机制可能回退读取安装包中的旧内容。修改限定版本内容可以使用热更新。
+- Manifest 修改需要重新安装。检查失败会在代码提交前中止；撤回改动后可再次 `reload`，或停止当前会话并重新运行 `hotRunDebug` 安装。
+- 开发 variant 需输出单个 universal APK，暂不支持 APK splits / dynamic feature 的资源更新。每次重载使用增量 APK 构建后提取资源，耗时会高于仅编译源码。
+- Compose 自动刷新针对通过 `androidx.activity.compose.setContent` 接入的开发入口；自建 ComposeView 未安装开发入口时，资源层会替换，但不会自动触发其 composition 刷新。
+- 已膨胀的传统 View 布局、Activity / Application 启动时读取的配置、系统管理的图标/标签，以及应用自行 `remember`、单例或图片库缓存的资源值，不会自动重新执行或清缓存。需要应用自行刷新，或重新安装/启动。已经打开的资源流也不会被替换。
+- 更新后开发入口中的 `LocalContext` 是委托原 Context 的 `ContextWrapper`，用于刷新资源与 painter 缓存。需要 Activity 时请沿 `ContextWrapper.baseContext` 查找，避免直接将 `LocalContext.current` 强转为 Activity。
+- 资源覆盖只在当前进程有效，结束开发会话后以安装包内容为准。runtime 和 host 协议已升级，更新插件后请重新运行 `hotRun` 安装匹配的 runtime。
+
+本地真机回归命令（执行后恢复示例文件）：
+
+```bash
+python3 tools/resource-test.py --serial DEVICE
+python3 tools/resource-test.py --serial DEVICE --auto --headless
+```
+
+2026-10-20 在 Android 16 / API 36 arm64 真机上通过资源手动回归 **18/18**（含拒绝后恢复）、无窗口自动回归 **10/10**，覆盖矢量图/PNG 缓存、raw/assets 文件描述符读取和状态保留。同时通过原有源码回归 **18/18**、开发工作流 **7/7**。`androidCheck` 通过 **23** 项单元测试（protocol 7、host 16）、插件校验与 runtime 构建，资源快照通过 4 字节 `zipalign` 检查。

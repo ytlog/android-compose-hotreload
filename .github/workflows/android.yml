@@ -31,5 +31,5 @@ jobs:
         run: ./gradlew prepareUpstream --console=plain
       - name: Verify Android modules
         run: ./gradlew androidCheck --console=plain
-      - name: Build standalone sample
-        run: ./sample/gradlew -p sample assembleDebug --console=plain
+      - name: Build standalone sample and resource snapshot
+        run: ./sample/gradlew -p sample hotResourcesDebug --console=plain

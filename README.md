@@ -1,6 +1,6 @@
 # Android Compose Hot Reload
 
-**在 Android 真机上热重载 Jetpack Compose 应用。** 修改 Kotlin / Java 代码和 Compose UI 后，编译变更并更新正在运行的应用；支持的修改无需重新安装 APK 或重启进程，并尽可能保留 `remember` 状态。
+**在 Android 真机上热重载 Jetpack Compose 应用。** 修改 Kotlin / Java 代码、Compose UI 和已有 Android 资源后，编译变更并更新正在运行的应用；支持的修改无需重新安装 APK 或重启进程，并尽可能保留 `remember` 状态。
 
 本项目实现了 Android Compose 热重载所需的 Gradle 集成、主机服务和设备运行时：将编译后的代码变更转换为 DEX 并发送到设备，通过 [art-dcevm](https://github.com/ytlog/art-dcevm) 在 ART 上重定义类，完成静态重初始化与 Compose UI 刷新。其中复用 [JetBrains Compose Hot Reload](https://github.com/JetBrains/compose-hot-reload) 的字节码分析、重载任务、通信和开发工具。热重载用于开发阶段的 debuggable 应用。
 
@@ -9,6 +9,7 @@
 ## 可以做什么
 
 - **修改 Compose UI 和函数实现**：重新编译变更，在运行中的应用里查看结果。
+- **更新 Android 资源**：修改已有资源的字符串、颜色、drawable、raw 和 assets 内容，沿用手动或自动重载流程，详见 [资源更新](docs/android.md#资源更新)。
 - **更新应用与本地 library 模块**：支持顶层属性的静态重初始化、添加类，以及 Kotlin / Java lambda 的变更。
 - **更新类与接口结构**：支持字段、方法的增删改、接口 default / abstract 演进，以及接口与实现类同批重载；具体变更由运行时事务校验，详见 [alpha.3 使用说明](docs/android.md#alpha3-代码变更)。
 - **手动或自动重载**：使用 Gradle 的 `reload` 任务，或以 `--auto` 模式启动，保存源码后自动编译并重载。
@@ -102,7 +103,7 @@ art-dcevm 及其依赖要求 `compileSdk 37`。使用 AGP `8.11.1` 时，可在�
 - 已初始化接口的初始化代码不会重跑；Kotlin companion 存储类按普通类重初始化，`const val` 的既有内联调用方需要重新编译。
 - 新增字段不会补跑已有实例的构造器；缓存的原始字段 offset 可能失效，已退役成员的旧引用不会因同名成员恢复而复活。改变调用方式或移除成员后，旧调用可能抛出相应的链接错误。
 - 原子性针对已有类定义。新增 DEX、类加载器缓存和任意用户副作用不能由失败事务完全回滚。
-- Android 资源和 manifest 的变更需要重新安装应用。
+- 新增、删除资源或改变资源 ID、删除已安装的资源文件或限定配置，以及 Manifest 修改，需要重新安装；已有资源内容支持热更新。
 - 尚未支持多进程应用与 minified variants。
 - devtools 的桌面窗口功能尚未接入 Android，包括截图、语义树、UI 操作和窗口尺寸控制。
 - 尚未接入 IDE 插件的 Android 运行配置，以及 `ReloadEffects`、`AfterHotReloadEffect` / `invokeAfterHotReload` 钩子。

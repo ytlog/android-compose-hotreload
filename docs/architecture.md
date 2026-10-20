@@ -25,11 +25,11 @@ android-compose-hotreload/
 | 模块 | 职责 | 依赖 |
 |---|---|---|
 | [protocol](../modules/protocol) | 有界帧协议、握手、重载消息、UI 结果与错误 | Java 标准库 |
-| [runtime](../modules/runtime) | 接收变更、追加 DEX、执行原子类重定义、静态重初始化及 Compose 刷新 | protocol、art-dcevm、应用提供的 Compose |
-| [host](../modules/host) | 管理设备会话、类索引、重载尝试、lambda 隔离和 DEX 转换 | protocol、上游分析与 tooling 构件、D8 |
+| [runtime](../modules/runtime) | 接收变更、追加 DEX、执行原子类重定义、替换资源、静态重初始化及 Compose 刷新 | protocol、art-dcevm、应用提供的 Compose |
+| [host](../modules/host) | 管理设备会话、类与资源索引、重载尝试、lambda 隔离和 DEX 转换 | protocol、上游分析与 tooling 构件、D8 |
 | [gradle-plugin](../modules/gradle-plugin) | 发现 debuggable variant、插桩入口、收集编译产物、配置启动与重载 | AGP、Kotlin Gradle API、上游 Gradle 构件 |
 
-插件通过 Maven 坐标配置 host 进程与 runtime 依赖，不把 host 打包进设备。协议和 runtime 不依赖上游 JVM agent。现有包名、插件 ID `io.github.ytlog.compose.hot-reload.android`、Maven 坐标及设备协议保持兼容。
+插件通过 Maven 坐标配置 host 进程与 runtime 依赖，不把 host 打包进设备。协议和 runtime 不依赖上游 JVM agent。包名、插件 ID `io.github.ytlog.compose.hot-reload.android` 和 Maven 坐标保留；资源更新使用设备协议版本 2，需配套安装新的 runtime。
 
 Gradle project 名仍为 `hot-reload-android-core`、`hot-reload-android-runtime`、`hot-reload-android-host` 和 `hot-reload-android-gradle-plugin`，由顶层 settings 映射到四个职责目录。因此 composite build 能继续按原有坐标替换项目依赖。
 
@@ -43,7 +43,7 @@ Gradle 编译 Kotlin / Java 变更，上游分析器计算需要失效的 Compos
 
 - `host/device`：ADB、设备连接、协议收发与当前请求的 ART 错误关联。
 - `host/dex`：D8、DEX accessor 读取和 lambda 隔离。
-- `host/session`：安装时字节码快照及运行中的分析索引。
+- `host/session`：安装时字节码/资源快照及运行中的分析索引，资源兼容性检查与确认摘要。
 - `host/reload`：准备定义、分析、生成 DEX、设备执行与提交的一次事务。
 - `host/upstream`：Java agent 桥接、分析兼容入口、orchestration 消息与 devtools 集成。
 
@@ -87,4 +87,12 @@ MCP、桌面示例、IDE 测试工程、Native/JS 目标和上游 CI/发布工�
 
 根目录的 `.github/workflows/android.yml` 在 GitHub Actions 上准备 SDK 和固定版本上游构件，运行 `androidCheck` 并构建独立示例。需要真机的测试保留为本地设备验证。
 
-资源和 Manifest 的边界保持原状，见 [当前限制](android.md#尚未支持)。
+## 资源更新链路
+
+Android 插件通过 AGP 的公开 `SingleArtifact.APK` 获取当前 variant 的完整资源产物。`hotResources<Variant>` 提取资源表、`res/`、`assets/` 和用于校验的 Manifest，借助 AGP 提供的 aapt2 记录资源 ID 与限定配置；保留条目的压缩方式，并将未压缩条目按 4 字节对齐，保持 `noCompress` 和文件描述符读取语义。不把 DEX、签名或 native 库放进资源快照。快照纳入现有 `hotSnapshot` 输入，因此手动 `reload` 和 `--auto` 共用同一链路。当前需要构建单个 universal APK，资源构建和合并由 AGP 负责。
+
+host 的 `ResourceIndex` 以启动时安装的快照为基线，先检查 Manifest、资源名称/ID，以及已安装文件和限定配置是否被删除。不兼容修改会在提交任何类之前拒绝；内容更新与代码放在同一条设备请求中，只有设备成功响应才确认资源摘要，失败后可重试。协议版本为 2，旧 runtime 需要重新运行 `hotRun` 安装。
+
+runtime 在主线程先解析新资源 provider，再执行类变更，接着用公开的 [ResourcesLoader](https://developer.android.com/reference/android/content/res/loader/ResourcesLoader) / [ResourcesProvider](https://developer.android.com/reference/android/content/res/loader/ResourcesProvider) 替换共享 provider，最后重初始化静态字段并刷新 Compose。Application、已有和后续创建的 Activity 共享 loader。开发入口独立于 devtools 开关，更新时提供新的 Resources 和 Context，并清理矢量图缓存以释放旧 Theme/Resources。Android 的 Theme 按样式序列比较并去重重复样式，runtime 用每个二进制位独立的空样式标记资源版本，使 Compose painter 的主题缓存键随更新变化，不改变主题属性。普通 `remember` 状态保留，不调用 Activity recreation。类定义、已追加 DEX、资源应用后的用户静态初始化等副作用，仍不构成可完整回滚的事务。
+
+`python3 tools/resource-test.py --serial DEVICE` 验证资源内容、代码混合更新和拒绝后恢复，`--auto` 验证保存资源触发自动重载。具体使用范围见 [资源更新](android.md#资源更新)。

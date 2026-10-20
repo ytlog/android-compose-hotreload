@@ -5,6 +5,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.toArgb
 import dev.compose.hotreload.sample.lib.LibraryCard
 
 class MainActivity : ComponentActivity() {
@@ -59,6 +65,29 @@ fun Counter() {
             LibraryCard()
             Text(JavaGreeting.text())
             Text(labelsText())
+            ResourceCard()
         }
     }
+}
+
+@Composable
+fun ResourceCard() {
+    val context = LocalContext.current
+    val icon = painterResource(R.drawable.resource_icon)
+    val bitmap = painterResource(R.drawable.resource_bitmap)
+    Image(icon, contentDescription = "Resource icon")
+    Text(stringResource(R.string.resource_message))
+    Text(stringResource(R.string.qualified_message))
+    Text("Color: ${colorResource(R.color.resource_color).toArgb().toUInt().toString(16)}")
+    Text("Drawable: ${icon.intrinsicSize.width / context.resources.displayMetrics.density}")
+    Text("Bitmap: ${bitmap.intrinsicSize.width}")
+    Text(context.resources.openRawResource(R.raw.resource_text).bufferedReader().use { it.readText().trim() })
+    Text(context.assets.open("resource_text.txt").bufferedReader().use { it.readText().trim() })
+    val rawFd = context.resources.openRawResourceFd(R.raw.resource_text).use {
+        it.createInputStream().bufferedReader().use { stream -> stream.readText().trim() }
+    }
+    val assetFd = context.assets.openFd("resource_text.txt").use {
+        it.createInputStream().bufferedReader().use { stream -> stream.readText().trim() }
+    }
+    Text("FD: $rawFd / $assetFd")
 }

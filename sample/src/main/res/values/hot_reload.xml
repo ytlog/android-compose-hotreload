@@ -1,0 +1,5 @@
+<resources>
+    <string name="resource_message">Resource text</string>
+    <string name="qualified_message">Qualified text</string>
+    <color name="resource_color">#336699</color>
+</resources>

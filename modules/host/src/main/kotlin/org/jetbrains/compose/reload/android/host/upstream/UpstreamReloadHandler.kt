@@ -9,6 +9,7 @@ import org.jetbrains.compose.reload.android.host.dex.Dexer
 import org.jetbrains.compose.reload.android.host.reload.ClassChange
 import org.jetbrains.compose.reload.android.host.reload.reload
 import org.jetbrains.compose.reload.android.host.session.ApplicationIndex
+import org.jetbrains.compose.reload.android.host.session.ResourceIndex
 import org.jetbrains.compose.reload.core.Context
 import org.jetbrains.compose.reload.core.createLogger
 import org.jetbrains.compose.reload.core.debug
@@ -35,14 +36,14 @@ private val logger = createLogger()
  * Port of the upstream agent's 'reloadRequestHandler.kt':
  * Requests are handled one after another; changes of failed requests are kept and retried with the next request.
  */
-internal fun launchReloadRequestHandler(index: ApplicationIndex, dexer: Dexer, device: Device) = launchTask {
+internal fun launchReloadRequestHandler(index: ApplicationIndex, dexer: Dexer, device: Device, resources: ResourceIndex) = launchTask {
     var pendingChanges = mapOf<File, ClassChange>()
 
     orchestration.messages.withType<ReloadClassesRequest>().collect { request ->
         pendingChanges = pendingChanges + request.changedClassFiles.mapValues { (_, change) -> ClassChange.valueOf(change.name) }
 
         val context = Context(ReloadClassesRequest with request)
-        val result = context.reload(index, dexer, device, pendingChanges) { deviceRequestId ->
+        val result = context.reload(index, dexer, device, pendingChanges, resources) { deviceRequestId ->
             reloadRequestIds[deviceRequestId] = request.messageId
         }
 
