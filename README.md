@@ -6,19 +6,19 @@
 
 This project implements the Gradle integration, host service, and device runtime for Android Compose hot reload. It converts compiled code changes to DEX, sends them to the device, and uses [art-dcevm](https://github.com/ytlog/art-dcevm) to redefine classes on ART, reinitialize statics, and refresh Compose UI. It reuses bytecode analysis, reload tasks, orchestration, and developer tools from [JetBrains Compose Hot Reload](https://github.com/JetBrains/compose-hot-reload). Hot reload is intended for debuggable apps during development.
 
-[Use in an existing project](#use-in-an-existing-project) · [Build from source and run the sample](#build-from-source-and-run-the-sample) · [Android guide (Chinese)](docs/android.md) · [Architecture (Chinese)](docs/architecture.md) · [License](LICENSE.txt)
+[Use in an existing project](#use-in-an-existing-project) · [Build from source and run the sample](#build-from-source-and-run-the-sample) · [Android guide](docs/android.md) · [Architecture](docs/architecture.md) · [License](LICENSE.txt)
 
 ## Features
 
 - **Edit Compose UI and function implementations:** recompile changes and see the results in the running app.
-- **Update Android resources:** change existing strings, colors, drawables, raw resources, and assets through the same manual or automatic reload workflow. See [resource updates (Chinese)](docs/android.md#资源更新).
+- **Update Android resources:** change existing strings, colors, drawables, raw resources, and assets through the same manual or automatic reload workflow. See [resource updates](docs/android.md#resource-updates).
 - **Update app and local library modules:** reinitialize top-level properties, add classes, and change Kotlin / Java lambdas.
-- **Evolve classes and interfaces:** add, remove, or change fields and methods; evolve default and abstract interface methods; reload interfaces and implementations in the same batch. Each change is checked by the runtime transaction. See the [alpha.3 guide (Chinese)](docs/android.md#alpha3-代码变更).
+- **Evolve classes and interfaces:** add, remove, or change fields and methods; evolve default and abstract interface methods; reload interfaces and implementations in the same batch. Each change is checked by the runtime transaction. See the [alpha.3 guide](docs/android.md#alpha3-code-changes).
 - **Reload manually or automatically:** run the Gradle `reload` task, or start with `--auto` to compile and reload when files are saved.
 - **Use developer tools:** inspect reload results, handle composition errors, and reset UI state through devtools.
 - **Inspect failures and retry:** ART rejection details are reported to devtools. Failed source changes remain pending, so you can revert an unsupported change or complete an implementation and reload again.
 
-State retention depends on the change and upstream Compose scope analysis. For example, changing the total number of lines in a source file may cause a composable containing `remember` to reset. See [state resets (Chinese)](docs/android.md#状态重置上游行为).
+State retention depends on the change and upstream Compose scope analysis. For example, changing the total number of lines in a source file may cause a composable containing `remember` to reset. See [state resets](docs/android.md#state-resets-upstream-behavior).
 
 ## Use in an existing project
 
@@ -101,7 +101,7 @@ art-dcevm and its dependencies require `compileSdk 37`. With AGP `8.11.1`, you c
 
 ## Current limitations
 
-- Structural class and interface changes depend on runtime services, boot types, and historical pointer-based JNI IDs. Changes such as adding native interface methods are still rejected. See the [full limitations (Chinese)](docs/android.md#尚未支持).
+- Structural class and interface changes depend on runtime services, boot types, and historical pointer-based JNI IDs. Changes such as adding native interface methods are still rejected. See the [full limitations](docs/android.md#limitations).
 - Initialization code in already initialized interfaces is not rerun. Kotlin companion storage classes are reinitialized as ordinary classes. Existing callers with inlined `const val` values need recompilation.
 - Adding fields does not rerun constructors for existing instances. Cached raw field offsets may become invalid, and restoring a member with the same name does not revive old references to the retired member. Changing invocation modes or removing members may cause linkage errors at old call sites.
 - Atomicity applies to existing class definitions. Added DEX files, class loader caches, and arbitrary user side effects cannot be fully rolled back after a failed transaction.
@@ -111,7 +111,7 @@ art-dcevm and its dependencies require `compileSdk 37`. With AGP `8.11.1`, you c
 - IDE plugin run configurations for Android, `ReloadEffects`, and the `AfterHotReloadEffect` / `invokeAfterHotReload` hooks are not connected yet.
 - `remember` state may reset when Compose scopes change. Hot reload does not guarantee state retention for every edit.
 
-See the [Android guide (Chinese)](docs/android.md#尚未支持) for more platform differences and limitations.
+See the [Android guide](docs/android.md#limitations) for more platform differences and limitations.
 
 ## Build from source and run the sample
 
@@ -141,4 +141,4 @@ Connect a device and run this from the repository root:
 
 Edit the [sample MainActivity.kt](sample/src/main/java/dev/compose/hotreload/sample/MainActivity.kt) to reload automatically. For manual mode, omit `--auto` and run `./sample/gradlew -p sample reload` in another terminal.
 
-See [architecture (Chinese)](docs/architecture.md) for more build and module details.
+See [architecture](docs/architecture.md) for more build and module details.

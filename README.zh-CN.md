@@ -6,19 +6,19 @@
 
 本项目实现了 Android Compose 热重载所需的 Gradle 集成、主机服务和设备运行时：将编译后的代码变更转换为 DEX 并发送到设备，通过 [art-dcevm](https://github.com/ytlog/art-dcevm) 在 ART 上重定义类，完成静态重初始化与 Compose UI 刷新。其中复用 [JetBrains Compose Hot Reload](https://github.com/JetBrains/compose-hot-reload) 的字节码分析、重载任务、通信和开发工具。热重载用于开发阶段的 debuggable 应用。
 
-[接入已有工程](#接入已有工程) · [源码构建与示例](#源码构建与示例) · [Android 详细说明](docs/android.md) · [工程架构](docs/architecture.md) · [许可证](LICENSE.txt)
+[接入已有工程](#接入已有工程) · [源码构建与示例](#源码构建与示例) · [Android 详细说明](docs/android.zh-CN.md) · [工程架构](docs/architecture.zh-CN.md) · [许可证](LICENSE.txt)
 
 ## 可以做什么
 
 - **修改 Compose UI 和函数实现**：重新编译变更，在运行中的应用里查看结果。
-- **更新 Android 资源**：修改已有资源的字符串、颜色、drawable、raw 和 assets 内容，沿用手动或自动重载流程，详见 [资源更新](docs/android.md#资源更新)。
+- **更新 Android 资源**：修改已有资源的字符串、颜色、drawable、raw 和 assets 内容，沿用手动或自动重载流程，详见 [资源更新](docs/android.zh-CN.md#资源更新)。
 - **更新应用与本地 library 模块**：支持顶层属性的静态重初始化、添加类，以及 Kotlin / Java lambda 的变更。
-- **更新类与接口结构**：支持字段、方法的增删改、接口 default / abstract 演进，以及接口与实现类同批重载；具体变更由运行时事务校验，详见 [alpha.3 使用说明](docs/android.md#alpha3-代码变更)。
+- **更新类与接口结构**：支持字段、方法的增删改、接口 default / abstract 演进，以及接口与实现类同批重载；具体变更由运行时事务校验，详见 [alpha.3 使用说明](docs/android.zh-CN.md#alpha3-代码变更)。
 - **手动或自动重载**：使用 Gradle 的 `reload` 任务，或以 `--auto` 模式启动，保存源码后自动编译并重载。
 - **使用上游开发工具**：通过 devtools 查看重载结果、处理 composition 异常、重置 UI 状态。
 - **查看失败原因并重试**：ART 原生拒绝原因回传到 devtools；失败的源码变更保留，撤回不支持的改动或补齐实现后可继续重载。
 
-状态保留取决于改动和上游的 Compose scope 分析。例如，文件总行数变化可能使使用 `remember` 的 composable 被判定为需要重置，详见 [状态重置说明](docs/android.md#状态重置上游行为)。
+状态保留取决于改动和上游的 Compose scope 分析。例如，文件总行数变化可能使使用 `remember` 的 composable 被判定为需要重置，详见 [状态重置说明](docs/android.zh-CN.md#状态重置上游行为)。
 
 ## 接入已有工程
 
@@ -101,7 +101,7 @@ art-dcevm 及其依赖要求 `compileSdk 37`。使用 AGP `8.11.1` 时，可在�
 
 ## 当前边界
 
-- 类与接口的结构演进受运行时服务、boot 类型和历史指针型 JNI ID 等条件限制；新增接口 native 方法等变更仍会被拒绝，详见 [完整限制](docs/android.md#尚未支持)。
+- 类与接口的结构演进受运行时服务、boot 类型和历史指针型 JNI ID 等条件限制；新增接口 native 方法等变更仍会被拒绝，详见 [完整限制](docs/android.zh-CN.md#尚未支持)。
 - 已初始化接口的初始化代码不会重跑；Kotlin companion 存储类按普通类重初始化，`const val` 的既有内联调用方需要重新编译。
 - 新增字段不会补跑已有实例的构造器；缓存的原始字段 offset 可能失效，已退役成员的旧引用不会因同名成员恢复而复活。改变调用方式或移除成员后，旧调用可能抛出相应的链接错误。
 - 原子性针对已有类定义。新增 DEX、类加载器缓存和任意用户副作用不能由失败事务完全回滚。
@@ -111,7 +111,7 @@ art-dcevm 及其依赖要求 `compileSdk 37`。使用 AGP `8.11.1` 时，可在�
 - 尚未接入 IDE 插件的 Android 运行配置，以及 `ReloadEffects`、`AfterHotReloadEffect` / `invokeAfterHotReload` 钩子。
 - `remember` 状态可能随 Compose scope 变化而重置；热重载不保证所有改动都保留状态。
 
-更多平台差异和限制见 [Android 说明](docs/android.md#尚未支持)。
+更多平台差异和限制见 [Android 说明](docs/android.zh-CN.md#尚未支持)。
 
 ## 源码构建与示例
 
@@ -141,4 +141,4 @@ export ANDROID_HOME="/path/to/Android/sdk"
 
 修改 [示例 MainActivity.kt](sample/src/main/java/dev/compose/hotreload/sample/MainActivity.kt) 后自动重载。手动模式去掉 `--auto`，再在另一个终端执行 `./sample/gradlew -p sample reload`。
 
-更多构建与模块说明见 [工程架构](docs/architecture.md)。
+更多构建与模块说明见 [工程架构](docs/architecture.zh-CN.md)。
