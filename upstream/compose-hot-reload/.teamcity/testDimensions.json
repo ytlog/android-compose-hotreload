@@ -1,0 +1,54 @@
+{
+  "kotlin": [
+    {
+      "version": "2.1.21"
+    },
+    {
+      "version": "2.2.0"
+    },
+    {
+      "version": "2.3.21"
+    },
+    {
+      "version": "2.4.20",
+      "isDefault": true
+    },
+    {
+      "version": "2.5.0-Beta1"
+    },
+    {
+      "version": "2.5.0-dev-7307"
+    }
+  ],
+  "gradle": [
+    {
+      "version": "8.7",
+      "isGradleIntegrationTest": true
+    },
+    {
+      "version": "8.14.5",
+      "isDefault": true
+    },
+    {
+      "version": "9.8.0",
+      "isGradleIntegrationTest": true
+    }
+  ],
+  "compose": [
+    {
+      "version": "1.10.3"
+    },
+    {
+      "version": "1.11.1",
+      "minKotlin": "2.2.0"
+    },
+    {
+      "version": "1.12.1",
+      "isDefault": true,
+      "minKotlin": "2.2.0"
+    },
+    {
+      "version": "1.13.0-alpha02+dev4912"
+    }
+  ]
+}

@@ -1,0 +1,495 @@
+$schema: properties.schema.json
+
+OrchestrationPort:
+  key: compose.reload.orchestration.port
+  type: int
+  target: [ build, devtools, application ]
+  documentation: |
+    Current 'Orchestration Server' port. This property is used by components that shall connect to the 
+    'orchestration' (e.g. recompiler, devtools, ...)
+
+PidFile:
+  key: compose.reload.pidFile
+  type: file
+  target: [ application, devtools ]
+  documentation: |
+    Path to the current applications pidfile
+
+ArgFile:
+  key: compose.reload.argfile
+  type: file
+  target: [ application, devtools, build ]
+  documentation: |
+    The java 'argfile' (see: https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html#java-command-line-argument-files)
+    containing all arguments of the current run
+
+MainClass:
+  key: compose.reload.mainClass
+  type: string
+  target: [ application, devtools ]
+  documentation: |
+    Property available in the application and 'devtools' pointing to the mainClass used to launch the application
+
+IsHeadless:
+  key: compose.reload.headless
+  type: boolean
+  default: "false"
+  target: [ application, devtools, build ]
+  documentation: |
+    Indicating whether or not the application is supposed to run in headless mode
+
+HeadlessJavaBinary:
+  key: compose.reload.headless.javaBinary
+  type: file
+  target: [ devtools ]
+  visibility: experimental
+  documentation: |
+    Path to the JetBrains Runtime 'java' launcher used by the MCP server to run headless
+    applications (see the 'run_headless' tool).
+
+HeadlessArgFile:
+  key: compose.reload.headless.argFile
+  type: file
+  target: [ devtools ]
+  visibility: experimental
+  documentation: |
+    Path to the JVM '@argfile' (DevApplication, hot classpath, agent, headless) used by the MCP
+    server to run headless applications (see the 'run_headless' tool).
+
+McpHeadlessToolsEnabled:
+  key: compose.reload.mcp.headlessToolsEnabled
+  type: boolean
+  default: "false"
+  target: [ build, devtools ]
+  visibility: experimental
+  documentation: |
+    Feature flag for the experimental headless MCP tools ('run_headless', 'close_headless', and the
+    'session_id' parameter of 'take_screenshot'), which let the MCP server launch a Compose
+    application in headless mode from a given @Composable.
+    - true: the headless MCP tools are exposed by the MCP server.
+    - false (default): the headless MCP tools are hidden entirely.
+
+IsHotReloadBuild:
+  key: compose.reload.isHotReloadBuild
+  type: boolean
+  default: "false"
+  target: [ build ]
+  documentation: |
+    Available in the build (e.g. Gradle) to indicate whether or not the current build is intended
+    to recompile classes for a hot reload build. Typically, this property is used to disable tasks
+    which are not required to produce classes and improve build speed.
+
+HotClasspath:
+  key: compose.reload.hotApplicationClasspath
+  type: string
+  target: [ application ]
+  documentation: |
+    The classpath known to be hot. This property is optional
+
+VirtualMethodResolveEnabled:
+  key: compose.reload.virtualMethodResolveEnabled
+  type: boolean
+  default: "true"
+  target: [ application, build ]
+  documentation: |
+    true: Enable dependency analysis for virtual calls:
+    e.g. Interfaces and their corresponding implementations will be tracked 
+
+DirtyResolveDepthLimit:
+  key: compose.reload.dirtyResolveDepthLimit
+  type: int
+  default: "5"
+  target: [ application, build ]
+  documentation: |
+    If a given scope is marked as dirty, then Hot Reload will follow the dependency graph between fields/methods
+    and further marks scopes as dirty. This property limits how deep this graph can be traversed.
+
+BuildSystem:
+  key: compose.reload.buildSystem
+  type: enum
+  enumClass: org.jetbrains.compose.reload.core.BuildSystem
+  target: [ application, devtools ]
+  documentation: |
+    Indicating the application which build system is supposed to be used for recompiling.
+    See further build-system specific (Gradle, Amper, ...) properties.
+
+GradleJavaHome:
+  key: org.gradle.java.home
+  type: file
+  target: [ application, devtools ]
+  documentation: |
+    The 'java home' used to run Gradle. The recompiler will pick the same java to launch 
+    the recompiler in order to avoid cache misses or other issues.
+
+GradleOfflineMode:
+  key: gradle.offline.mode
+  type: boolean
+  default: "false"
+  target: [ application, devtools ]
+  documentation: |
+    The 'offline mode' used to run Gradle. The recompiler will pick the same offline mode to launch 
+    the recompiler in order to avoid cache misses or other issues.
+
+GradleBuildRoot:
+  key: gradle.build.root
+  type: file
+  target: [ application, devtools ]
+  documentation: |
+    The root path to the current Gradle project
+
+GradleBuildProject:
+  key: gradle.build.project
+  type: string
+  target: [ application, devtools ]
+  documentation: |
+    The gradle 'path' to the 'project' which is currently executed and needs recompiling.
+    e.g. ':app:' or ':' or ':someModule:composeApp'
+
+GradleBuildTask:
+  key: gradle.build.task
+  type: string
+  target: [ application, devtools ]
+  documentation: |
+    The name of the task which is supposed to be recompiled for hot reload. 
+    This is typically the name of a 'ComposeReloadHotClasspathTask' task. 
+
+GradleBuildContinuous:
+  key: compose.reload.build.continuous
+  type: boolean
+  default: "false"
+  target: [ application, devtools, build ]
+  visibility: delicate
+  documentation: |
+    - true: Compose Hot Reload will start a recompiler Gradle Daemon, which will continuously rebuilt/reload the project
+    by watching all  inputs to the build
+    - false: The user is expected to rebuild/reload manually by launching a task (or using tooling)
+    Continuous mode is subject to change and might be removed in the future.
+
+GradleWarmupEnabled:
+  key: compose.reload.build.warmup
+  type: boolean
+  default: "false"
+  target: [ application, devtools, build ]
+  visibility: delicate
+  documentation: |
+    - true: Compose Hot Reload will launch a warmup recompile request when the application is started, to ensure that
+    the recompiler Gradle daemon is running and ready to handle requests
+    - false: No warmup request will be sent, first reload request may take longer time
+
+GradleBuildOptimize:
+  key: compose.reload.gradle.build.optimize
+  type: boolean
+  default: "true"
+  target: [ application, devtools, build ]
+  visibility: delicate
+  documentation: |
+    - true: Compose Hot Reload will try to optimize your build during hot reload
+    (e.g. by enabling Gradle's configuration cache during 'recompilation')
+    - false: No optimization will be performed.
+
+GradleBuildOptimizeUnsafe:
+  key: compose.reload.gradle.build.optimize.unsafe
+  type: boolean
+  default: "false"
+  target: [ application, devtools, build ]
+  visibility: delicate
+  documentation: |
+    - true: Compose Hot Reload will pass '-Pkotlin.internal.incremental.enableUnsafeOptimizationsForMultiplatform=true'
+    to Gradle during recompilation. This may improve incremental compilation performance but can cause unexpected
+    Kotlin compiler crashes (see https://youtrack.jetbrains.com/issue/CMP-10146).
+    - false: The unsafe incremental compilation optimization for multiplatform will not be enabled.
+
+AmperBuildRoot:
+  key: amper.build.root
+  type: string
+  target: [ application, devtools ]
+
+AmperBuildTask:
+  key: amper.build.task
+  type: string
+  target: [ application, devtools ]
+
+DevToolsEnabled:
+  key: compose.reload.devToolsEnabled
+  type: boolean
+  default: "true"
+  target: [ application, devtools, build ]
+  visibility: public
+  documentation: |
+    Flag to disable the 'devtools' application entirely
+
+DevToolsIsHeadless:
+  key: compose.reload.devToolsHeadless
+  type: boolean
+  default: "false"
+  target: [ application, devtools, build ]
+  visibility: public
+  documentation: |
+    Run the dev tools in headless mode (No UI window shown)
+
+DevToolsClasspath:
+  key: compose.reload.devToolsClasspath
+  type: files
+  target: [ application ]
+  documentation: |
+    The classpath notation of the devTools application. 
+    Hot Reload will start DevTools in a different process and therefore needs the classpath
+
+DevToolsTransparencyEnabled:
+  key: compose.reload.devToolsTransparencyEnabled
+  type: boolean
+  default: "(Os.currentOrNull() != Os.Linux).toString()"
+  defaultIsExpression: true
+  target: [ application, build, devtools ]
+  visibility: delicate
+  documentation: |
+    Some platforms might not be able to render transparency correctly (e.g. some linux environments).
+    This property will allow such platforms to disable/enable transparency. This property is subject to change
+    if the issues with transparency rendering are resolved..
+
+DevToolsDetached:
+  key: compose.reload.devToolsDetached
+  type: boolean
+  default: "false"
+  target: [ application, build, devtools ]
+  visibility: public
+  documentation: |
+    If enabled, dev tools window will be detached from the main application
+
+ReloadEffectsEnabled:
+  key: compose.reload.effectsEnabled
+  type: boolean
+  default: "true"
+  target: [ application, build ]
+  visibility: public
+  documentation: |
+    Enable reload effects that are shown in the UI when a reload is triggered.
+
+CompositionHardResetEnabled:
+  key: compose.reload.compositionHardResetEnabled
+  type: boolean
+  default: "true"
+  target: [ application ]
+  visibility: delicate
+  documentation: |
+    Selects the strategy used by 'Reset UI' button.
+    - true: hard reset - recreates the application window. 
+            So the window blinks but the app recovers from non-consistent/corrupted state 
+            that can happen due to erroneous reloads.  
+    - false: light reset - dispose and recompose the entry point subtree. 
+             The window does not blink but may fail to recover from non-consistent/corrupted state 
+             due to possible bugs in Compose Runtime. 
+
+IntelliJDebuggerDispatchPort:
+  key: compose.reload.idea.debugger.dispatch.port
+  type: int
+  target: [ application, devtools, build ]
+  documentation: |
+    Note: Expected as an environment variable, as this is expected to be transitively available
+    to all child processes.\n
+    Currently, launching applications with hot reload might be done through a couple of
+    intermediate processes. For example, launching a test will go through a chain like
+    ```
+    intellij --launches--> Gradle --launches--> JVM(Junit) --launches--> Gradle
+    --launches--> JVM (Application)
+    ```
+    When a run configuration is started in 'debug mode' intellij will set the system property
+    'idea.debugger.dispatch.port'. This will indicate that a server is listening at this port, which can
+    be used to provision debugging servers.
+    This debug port will then be made available as an environment variable using this key.
+    Launching the final application will respect this port, if present and provision a debugging session.
+    This will allow a test to be deeply debuggable by just pressing 'Debug'
+
+SubprocessDebuggingEnabled:
+  key: compose.reload.subprocessDebuggingEnabled
+  type: boolean
+  default: "false"
+  target: [ build ]
+  documentation: |
+    Enable this property to allow propagating the 'idea.debugger.dispatch.port' to all subprocesses.
+    This is useful when debugging dev tools. Note: this may break the debugging of the user application if IJ is
+    not configured to accept multiple debugging sessions. Not recommended to use outside of hot reload debugging.
+
+JetBrainsRuntimeBinary:
+  key: compose.reload.jbr.binary
+  type: file
+  target: [ build ]
+  visibility: delicate
+  documentation: |
+    The path to the 'JetBrainsRuntime' which shall be used when launching the app. 
+    Note: This is a build-only property!
+
+JetBrainsRuntimeVersion:
+  key: compose.reload.jbr.version
+  type: int
+  default: "25"
+  target: [ build ]
+  visibility: delicate
+  documentation: |
+    Specifies the default 'JetBrains Runtime' version that shall be used when the 
+    user project does not explicitly declare toolchain requirements.
+
+JetBrainsRuntimeMinimalVersion:
+  key: compose.reload.jbr.min.version
+  type: int
+  default: "21"
+  target: [ build ]
+  visibility: internal
+  documentation: |
+    Specifies the minimal 'JetBrains Runtime' version required by Compose Hot Reload. 
+    If the project's toolchain language version is set but is lower than this value,
+    the plugin will override it and use this version instead.
+
+GradleJetBrainsRuntimeProvisioningEnabled:
+  key: compose.reload.jbr.gradleProvisioningEnabled
+  type: boolean
+  default: "true"
+  target: [ build ]
+  visibility: internal
+  documentation: |
+    If enabled Compose Hot Reload Gradle plugin will attempt to automatically provision compatible 'JetBrains Runtime'
+    version via Gradle's toolchain resolution mechanism. This property is internal and only indended for use in tests.
+
+AutoJetBrainsRuntimeProvisioningEnabled:
+  key: compose.reload.jbr.autoProvisioningEnabled
+  type: boolean
+  default: "false"
+  target: [ build ]
+  visibility: experimental
+  documentation: |
+    Automatically provisions compatible 'JetBrains Runtime' version that shall be used for hot reload tasks
+
+AutoRuntimeDependenciesEnabled:
+  key: compose.reload.autoRuntimeDependenciesEnabled
+  type: boolean
+  default: "true"
+  target: [ build ]
+  documentation: |
+    Whether or not the hot-reload-runtime will be added as a compile dependency automatically when running a build.
+
+IdeaComposeHotReload:
+  key: idea.compose.hot-reload
+  type: boolean
+  target: [ build, application, devtools ]
+  default: "false"
+  documentation: |
+    Set by IntelliJ to signal the Gradle Plugin that IDE tooling is available.
+    Setting this variable will relax the Gradle Plugin to not touch existing run tasks as we expect
+    the IDE to provide a convenient way of launching in hot-reload mode.
+
+IdeaComposeHotReloadSupportVersion:
+  key: idea.compose.hot-reload.version
+  type: int
+  target: [ build, application, devtools ]
+  documentation: |
+    Set by IntelliJ during builds to convey its 'support level' for hot reload.
+    Not Present, but 'idea.compose.hot-reload' being set: Supports running hot run tasks
+    2: Support running 'hot run' tasks and 'hot reload' tasks
+    3: Supports providing IDEA runtime using 'idea.compose.hot-reload.jbr'
+
+IdeaJetBrainsRuntimeBinary:
+  key: idea.compose.hot-reload.jbr
+  type: file
+  target: [ build ]
+  documentation: |
+    Forwards the 'JetBrains Runtime' which is bundled with the current version of IntelliJ
+    - (Points to the binary (bin/java))
+    - Can be used as 'fallback' when no other JBR is found
+
+StdinFile:
+  key: compose.reload.stdinFile
+  type: file
+  target: [ build, application, devtools ]
+  visibility: delicate
+  documentation: |
+    Used by 'async'/'non-blocking' launches of the application.
+    Will point to the stdin file (can be pipe)
+    'async'/'non-blocking' mode is subject to change and might be removed in the future.
+
+StdoutFile:
+  key: compose.reload.stdoutFile
+  type: file
+  target: [ build, application, devtools ]
+  visibility: delicate
+  documentation: |
+    Used by 'async'/'non-blocking' launches of the application.
+    Will point to a file where the stdout is supposed to be written to.
+    'async'/'non-blocking' mode is subject to change and might be removed in the future.
+
+StderrFile:
+  key: compose.reload.stderrFile
+  type: file
+  target: [ build, application, devtools ]
+  visibility: delicate
+  documentation: |
+    Used by 'async'/'non-blocking' launches of the application.
+    Will point to a file where the stderr is supposed to be written to.
+    'async'/'non-blocking' mode is subject to change and might be removed in the future.
+
+ParentPid:
+  key: compose.reload.parentPid
+  type: long
+  target: [ devtools, build ]
+  documentation: |
+    The pid of the parent process. This property is used by components that shall connect to the 
+    'orchestration' (e.g. recompiler, devtools, ...).
+    If the parent dies, it is expected that children exit as well.
+
+LaunchMode:
+  key: compose.reload.launchMode
+  type: enum
+  enumClass: org.jetbrains.compose.reload.core.LaunchMode
+  target: [ application, devtools ]
+  documentation: |
+    Tells the application 'how' it was launched
+
+LogLevel:
+  key: compose.reload.logLevel
+  type: enum
+  enumClass: org.jetbrains.compose.reload.core.Logger.Level
+  target: [ application, devtools, build ]
+  default: "Info"
+  visibility: public
+  documentation: |
+    Minimum logging level
+
+LogStdout:
+  key: compose.reload.logStdout
+  type: boolean
+  target: [ application, build, devtools ]
+  default: "false"
+  visibility: public
+  documentation: |
+    Enable output of all logs into the standard output
+
+IsHotReloadActive:
+  key: compose.reload.isActive
+  type: boolean
+  target: [ application ]
+  default: "false"
+  visibility: public
+  documentation: |
+    Will be set to 'true' if the application is launched with Hot Reload and therefore can be used
+    to detect if hot reload is 'active'
+
+IsolatedProjectsEnabled:
+  key: compose.reload.isolatedProjectsEnabled
+  type: boolean
+  target: [ application, build, devtools ]
+  default: "false"
+  visibility: deprecated
+  documentation: |
+    Enables support for Gradle's incubating 'isolated projects' feature
+
+StaticsReinitializeMode:
+  key: compose.reload.staticsReinitializeMode
+  type: enum
+  enumClass: org.jetbrains.compose.reload.core.StaticsReinitializeMode
+  target: [ application, build ]
+  default: "AllDirty"
+  visibility: experimental
+  documentation: |
+    Sets the mode for statics re-initialization. 
+    When "AllDirty" is set, all static initializers that are recognized as dirty (affected by changes) 
+    will be re-invoked on reload.
+    When "ChangedOnly" is set, only statics of changed classes will be re-initialized.

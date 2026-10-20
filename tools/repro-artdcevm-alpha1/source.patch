@@ -1,0 +1,21 @@
+--- a/android/sample/src/main/java/dev/compose/hotreload/sample/Labels.kt
++++ b/android/sample/src/main/java/dev/compose/hotreload/sample/Labels.kt
+@@ -2,6 +2,7 @@
+ 
+ /** A lambda inside an interface (default method) */
+ interface Labels {
++    fun required(): String
+     fun label(): String {
+         val text: () -> String = { "Interface lambda" }
+         return text()
+@@ -9,8 +10,9 @@
+ }
+ 
+ object DefaultLabels : Labels {
++    override fun required(): String = "Abstract batch: "
+     fun implementationText(): String = "Implementation"
+ }
+ 
+ /** A non-composable caller, so editing interface calls does not change Counter's own restart group. */
+-fun labelsText(): String = DefaultLabels.label() + " / " + DefaultLabels.implementationText()
++fun labelsText(): String = DefaultLabels.required() + DefaultLabels.label() + " / " + DefaultLabels.implementationText()

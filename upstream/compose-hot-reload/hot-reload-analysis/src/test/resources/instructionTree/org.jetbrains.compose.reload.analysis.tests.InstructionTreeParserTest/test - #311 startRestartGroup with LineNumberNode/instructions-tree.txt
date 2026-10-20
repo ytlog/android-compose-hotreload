@@ -1,0 +1,104 @@
+/* Code */
+import androidx.compose.runtime.*
+
+@Composable
+fun Foot(param: String): String {
+    return key(param) {
+        if (param.isEmpty()) {
+            "Empty"
+        } else {
+            val state = remember { mutableStateOf("") }
+            state.value
+        }
+    }
+}
+
+ /* Tree */ 
+class TestKt {
+    fun Foot (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Ljava/lang/String; {
+        Method (group=ComposeGroupKey(key=-227918768)) {
+            LabelToken(L0)
+            BlockToken(4)
+            JumpToken(L1, opocde=153)
+            BlockToken(5)
+            LabelToken(L1)
+            BlockToken(3)
+            LabelToken(L2, lineNumber=5)
+            BlockToken(2)
+            LabelToken(L3, lineNumber=6)
+            BlockToken(3)
+            JumpToken(L4, opocde=154)
+            BlockToken(1)
+            JumpToken(L5, opocde=167)
+            LabelToken(L4)
+            BlockToken(2)
+            LabelToken(L5, lineNumber=6)
+            BlockToken(1)
+            JumpToken(L8, opocde=153)
+            BlockToken(1)
+            LabelToken(L7, lineNumber=7)
+            BlockToken(1)
+            JumpToken(L27, opocde=167)
+            LabelToken(L8)
+            BlockToken(2)
+            BlockToken(1)
+            LabelToken(L27, lineNumber=6)
+            BlockToken(5)
+            LabelToken(L28, lineNumber=5)
+            BlockToken(2)
+            JumpToken(L29, opocde=153)
+            BlockToken(1)
+            LabelToken(L29)
+            BlockToken(2)
+            ReturnToken(returnInsn=176)
+    
+            ReplaceGroup (group=ComposeGroupKey(key=415364755)) {
+                StartReplaceGroup(key=ComposeGroupKey(key=415364755))
+                BlockToken(1)
+                LabelToken(L6, lineNumber=8)
+                EndReplaceGroup()
+            }
+    
+            ReplaceGroup (group=ComposeGroupKey(key=415403319)) {
+                StartReplaceGroup(key=ComposeGroupKey(key=415403319))
+                BlockToken(4)
+                LabelToken(L10, lineNumber=9)
+                BlockToken(1)
+                LabelToken(L11)
+                BlockToken(2)
+                LabelToken(L12, lineNumber=14)
+                BlockToken(3)
+                LabelToken(L13)
+                BlockToken(2)
+                LabelToken(L14, lineNumber=15)
+                BlockToken(3)
+                JumpToken(L21, opocde=166)
+                LabelToken(L15, lineNumber=16)
+                BlockToken(2)
+                LabelToken(L16, lineNumber=9)
+                BlockToken(5)
+                LabelToken(L17, lineNumber=16)
+                BlockToken(1)
+                LabelToken(L18, lineNumber=17)
+                BlockToken(3)
+                LabelToken(L19, lineNumber=18)
+                BlockToken(1)
+                LabelToken(L20)
+                JumpToken(L22, opocde=167)
+                LabelToken(L21, lineNumber=19)
+                BlockToken(2)
+                LabelToken(L22, lineNumber=14)
+                BlockToken(2)
+                LabelToken(L23, lineNumber=14)
+                BlockToken(1)
+                LabelToken(L24, lineNumber=9)
+                BlockToken(2)
+                LabelToken(L25, lineNumber=10)
+                BlockToken(2)
+                LabelToken(L26, lineNumber=8)
+                BlockToken(3)
+                EndReplaceGroup()
+            }
+        }
+    }
+}

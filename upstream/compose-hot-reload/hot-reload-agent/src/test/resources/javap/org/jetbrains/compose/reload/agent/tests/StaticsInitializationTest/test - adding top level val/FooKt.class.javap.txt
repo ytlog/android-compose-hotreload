@@ -1,0 +1,114 @@
+Classfile <bytecode path>
+  Last modified <Date>; size 665 bytes
+  SHA-256 checksum ab0b2ef40961fb7c41cc0b1e301c01db8bc991cf803a2cbbbb4e5e4e58be5b7d
+  Compiled from "Test.kt"
+public final class TestKt
+  minor version: 0
+  major version: 55
+  flags: (0x0031) ACC_PUBLIC, ACC_FINAL, ACC_SUPER
+  this_class: #2                          // TestKt
+  super_class: #4                         // java/lang/Object
+  interfaces: 0, fields: 2, methods: 4, attributes: 2
+Constant pool:
+   #1 = Utf8               TestKt
+   #2 = Class              #1             // TestKt
+   #3 = Utf8               java/lang/Object
+   #4 = Class              #3             // java/lang/Object
+   #5 = Utf8               getEmpty
+   #6 = Utf8               ()I
+   #7 = Utf8               empty
+   #8 = Utf8               I
+   #9 = NameAndType        #7:#8          // empty:I
+  #10 = Fieldref           #2.#9          // TestKt.empty:I
+  #11 = Utf8               getFoo
+  #12 = Utf8               foo
+  #13 = NameAndType        #12:#8         // foo:I
+  #14 = Fieldref           #2.#13         // TestKt.foo:I
+  #15 = Utf8               <clinit>
+  #16 = Utf8               ()V
+  #17 = Utf8               Lkotlin/Metadata;
+  #18 = Utf8               mv
+  #19 = Integer            2
+  #20 = Integer            3
+  #21 = Integer            0
+  #22 = Utf8               k
+  #23 = Utf8               xi
+  #24 = Integer            48
+  #25 = Utf8               d1
+  #26 = Utf8               \u0000\n\n\u0000\n\u0002\u0010\b\n\u0002\b\u0005\"\u0014\u0010\u0000\u001a\u00020\u0001X\u0086D¢\u0006\b\n\u0000\u001a\u0004\b\u0002\u0010\u0003\"\u0014\u0010\u0004\u001a\u00020\u0001X\u0086D¢\u0006\b\n\u0000\u001a\u0004\b\u0005\u0010\u0003¨\u0006\u0006
+  #27 = Utf8               d2
+  #28 = Utf8
+  #29 = Utf8               testModule
+  #30 = Utf8               Test.kt
+  #31 = Utf8               Code
+  #32 = Utf8               LineNumberTable
+  #33 = Utf8               SourceFile
+  #34 = Utf8               RuntimeVisibleAnnotations
+  #35 = Utf8               $chr$clinit
+{
+  private static int empty;
+    descriptor: I
+    flags: (0x000a) ACC_PRIVATE, ACC_STATIC
+
+  private static int foo;
+    descriptor: I
+    flags: (0x000a) ACC_PRIVATE, ACC_STATIC
+
+  public static final int getEmpty();
+    descriptor: ()I
+    flags: (0x0019) ACC_PUBLIC, ACC_STATIC, ACC_FINAL
+    Code:
+      stack=1, locals=0, args_size=0
+         0: getstatic     #10                 // Field empty:I
+         3: ireturn
+      LineNumberTable:
+        line 1: 0
+
+  public static final int getFoo();
+    descriptor: ()I
+    flags: (0x0019) ACC_PUBLIC, ACC_STATIC, ACC_FINAL
+    Code:
+      stack=1, locals=0, args_size=0
+         0: getstatic     #14                 // Field foo:I
+         3: ireturn
+      LineNumberTable:
+        line 2: 0
+
+  static {};
+    descriptor: ()V
+    flags: (0x0008) ACC_STATIC
+    Code:
+      stack=1, locals=0, args_size=0
+         0: bipush        42
+         2: putstatic     #10                 // Field empty:I
+         5: bipush        42
+         7: putstatic     #14                 // Field foo:I
+        10: return
+      LineNumberTable:
+        line 1: 0
+        line 2: 5
+
+  public static void $chr$clinit();
+    descriptor: ()V
+    flags: (0x0009) ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=1, locals=0, args_size=0
+         0: bipush        42
+         2: putstatic     #10                 // Field empty:I
+         5: bipush        42
+         7: putstatic     #14                 // Field foo:I
+        10: return
+      LineNumberTable:
+        line 1: 0
+        line 2: 5
+}
+SourceFile: "Test.kt"
+RuntimeVisibleAnnotations:
+  0: #17(#18=[I#19,I#20,I#21],#22=I#19,#23=I#24,#25=[s#26],#27=[s#7,s#28,s#5,s#6,s#12,s#11,s#29])
+    kotlin.Metadata(
+      mv=[2,3,0]
+      k=2
+      xi=48
+      d1=["\u0000\n\n\u0000\n\u0002\u0010\b\n\u0002\b\u0005\"\u0014\u0010\u0000\u001a\u00020\u0001X\u0086D¢\u0006\b\n\u0000\u001a\u0004\b\u0002\u0010\u0003\"\u0014\u0010\u0004\u001a\u00020\u0001X\u0086D¢\u0006\b\n\u0000\u001a\u0004\b\u0005\u0010\u0003¨\u0006\u0006"]
+      d2=["empty","","getEmpty","()I","foo","getFoo","testModule"]
+    )

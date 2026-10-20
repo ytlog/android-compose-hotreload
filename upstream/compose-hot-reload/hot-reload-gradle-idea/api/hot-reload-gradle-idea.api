@@ -1,0 +1,39 @@
+public abstract interface class org/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel : java/io/Serializable {
+	public static final field Companion Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel$Companion;
+	public abstract fun getRunTasks ()Ljava/util/List;
+	public abstract fun getVersion ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class org/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadSupportVersions {
+	public static final field INSTANCE Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadSupportVersions;
+	public final fun getSupportReloadTasks ()I
+}
+
+public abstract interface class org/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask : java/io/Serializable {
+	public static final field Companion Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask$Companion;
+	public abstract fun getArgFile ()Ljava/nio/file/Path;
+	public abstract fun getArgFileTaskName ()Ljava/lang/String;
+	public abstract fun getCompilationName ()Ljava/lang/String;
+	public abstract fun getSourceSets ()Ljava/util/List;
+	public abstract fun getTargetName ()Ljava/lang/String;
+	public abstract fun getTaskClass ()Ljava/lang/String;
+	public abstract fun getTaskName ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class org/jetbrains/compose/reload/gradle/idea/ModelKt {
+	public static final fun IdeaComposeHotReloadModel (Ljava/lang/String;Ljava/util/List;)Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel;
+	public static synthetic fun IdeaComposeHotReloadModel$default (Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel;
+	public static final fun IdeaComposeHotRunTask (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/nio/file/Path;Ljava/lang/String;)Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask;
+	public static synthetic fun IdeaComposeHotRunTask$default (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/nio/file/Path;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask;
+	public static final fun copy (Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel;)Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotReloadModel;
+	public static final fun copy (Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask;)Lorg/jetbrains/compose/reload/gradle/idea/IdeaComposeHotRunTask;
+}
+

@@ -1,0 +1,69 @@
+public class org/jetbrains/compose/reload/ComposeHotRun : org/gradle/api/DefaultTask {
+	public fun <init> ()V
+}
+
+public abstract class org/jetbrains/compose/reload/gradle/AbstractComposeHotRun : org/gradle/api/tasks/JavaExec, org/jetbrains/compose/reload/gradle/ComposeHotReloadRunTask {
+	public final fun getCompilation ()Lorg/gradle/api/provider/Property;
+	public final fun getIsAutoReloadEnabled ()Lorg/gradle/api/provider/Property;
+}
+
+public abstract interface class org/jetbrains/compose/reload/gradle/ComposeHotReloadArgumentsBuilder {
+	public abstract fun isAutoRecompileEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun isGradleBuildOptimizeEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun isGradleBuildOptimizeUnsafeEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun isRecompilerWarmupEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setAgentJar (Lorg/gradle/api/file/FileCollection;)V
+	public abstract fun setArgFile (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setDevToolsAnimationsEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setDevToolsClasspath (Lorg/gradle/api/file/FileCollection;)V
+	public abstract fun setDevToolsDetached (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setDevToolsEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setDevToolsHeadless (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setDevToolsTransparencyEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setHotClasspath (Lorg/gradle/api/file/FileCollection;)V
+	public abstract fun setIsHeadless (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setMainClass (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setPidFile (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setReloadEffectsEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setReloadOverlayEnabled (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setReloadTaskName (Ljava/lang/String;)V
+	public abstract fun setReloadTaskName (Lorg/gradle/api/provider/Provider;)V
+	public abstract fun setStaticsReinitializeMode (Lorg/gradle/api/provider/Provider;)V
+}
+
+public final class org/jetbrains/compose/reload/gradle/ComposeHotReloadArgumentsKt {
+	public static final fun createComposeHotReloadArguments (Lorg/gradle/api/Project;Lkotlin/jvm/functions/Function1;)Lorg/gradle/process/CommandLineArgumentProvider;
+	public static final fun withComposeHotReload (Lorg/gradle/process/JavaForkOptions;Lkotlin/jvm/functions/Function1;)V
+}
+
+public class org/jetbrains/compose/reload/gradle/ComposeHotReloadExtension {
+	public fun <init> (Lorg/gradle/api/Project;)V
+}
+
+public abstract interface class org/jetbrains/compose/reload/gradle/ComposeHotReloadOtherTask : org/jetbrains/compose/reload/gradle/ComposeHotTask {
+}
+
+public final class org/jetbrains/compose/reload/gradle/ComposeHotReloadPlugin : org/gradle/api/Plugin {
+	public fun <init> ()V
+	public synthetic fun apply (Ljava/lang/Object;)V
+	public fun apply (Lorg/gradle/api/Project;)V
+}
+
+public abstract interface class org/jetbrains/compose/reload/gradle/ComposeHotReloadRunTask : org/jetbrains/compose/reload/gradle/ComposeHotTask {
+}
+
+public class org/jetbrains/compose/reload/gradle/ComposeHotRun : org/jetbrains/compose/reload/gradle/AbstractComposeHotRun {
+	public fun <init> ()V
+}
+
+public abstract interface class org/jetbrains/compose/reload/gradle/ComposeHotTask : org/gradle/api/Task {
+	public static final field Companion Lorg/jetbrains/compose/reload/gradle/ComposeHotTask$Companion;
+}
+
+public final class org/jetbrains/compose/reload/gradle/ComposeHotTask$Companion {
+}
+
+public final class org/jetbrains/compose/reload/gradle/PropertiesKt {
+	public static final fun isHotReloadBuild (Lorg/gradle/api/Project;)Z
+}
+

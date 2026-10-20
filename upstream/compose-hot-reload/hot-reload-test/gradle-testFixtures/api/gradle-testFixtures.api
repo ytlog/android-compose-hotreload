@@ -1,0 +1,724 @@
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/AndroidHotReloadTest : java/lang/annotation/Annotation {
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/AndroidManifestExtension {
+	public abstract fun buildTemplate (Lorg/jetbrains/compose/reload/core/TemplateBuilder;Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+	public abstract fun manifestBody (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun manifestTag (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode : java/lang/Enum, org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode$Companion;
+	public static final field Detached Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public static final field GradleBlocking Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public fun displayName ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public static fun values ()[Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/BuildGradleKts : java/lang/annotation/Annotation {
+	public abstract fun path ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/BuildGradleKts$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKts;
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension {
+	public abstract fun buildTemplate (Lorg/jetbrains/compose/reload/core/TemplateBuilder;Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+	public abstract fun commonDependencies (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun compilerOptions (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun composeCompiler (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun footer (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun header (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun javaExecConfigure (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun jvmMainDependencies (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun kotlin (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun plugins (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension$DefaultImpls {
+	public static fun buildTemplate (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/jetbrains/compose/reload/core/TemplateBuilder;Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+	public static fun commonDependencies (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun compilerOptions (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun composeCompiler (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun footer (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun header (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun javaExecConfigure (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun jvmMainDependencies (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun kotlin (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun plugins (Lorg/jetbrains/compose/reload/test/gradle/BuildGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/BuildMode : java/lang/Enum, org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/BuildMode$Companion;
+	public static final field Continuous Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public static final field Explicit Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public fun displayName ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public static fun values ()[Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/BuildMode$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/CheckScreenshot : java/lang/annotation/Annotation {
+	public abstract fun colorTolerance ()F
+	public abstract fun radius ()I
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/CheckScreenshotKt {
+	public static final fun checkScreenshot (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/CheckSemanticTreeKt {
+	public static final fun checkSemanticTree (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ComposeVersion : java/io/Serializable, java/lang/Comparable {
+	public fun <init> (IIILjava/lang/String;)V
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo (Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;)I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClassifier ()Ljava/lang/String;
+	public final fun getMajor ()I
+	public final fun getMaturity ()Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public final fun getMinor ()I
+	public final fun getPatch ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity : java/lang/Enum {
+	public static final field ALPHA Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static final field BETA Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static final field DEV Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static final field RC Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static final field SNAPSHOT Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static final field STABLE Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+	public static fun values ()[Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion$Maturity;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ComposeVersionKt {
+	public static final fun ComposeVersion (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;
+	public static final fun compareTo (Ljava/lang/String;Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;)I
+	public static final fun compareTo (Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;Ljava/lang/String;)I
+	public static final fun getClassifierNumber (Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;)Ljava/lang/Integer;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/CopyProjectRecursivelyKt {
+	public static final fun copyProjectRecursively (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/nio/file/Path;)V
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/Debug : java/lang/annotation/Annotation {
+	public abstract fun target ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/DisabledVersion : java/lang/annotation/Annotation {
+	public abstract fun compose ()Ljava/lang/String;
+	public abstract fun gradle ()Ljava/lang/String;
+	public abstract fun kotlin ()Ljava/lang/String;
+	public abstract fun reason ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/DisabledVersion$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/DisabledVersion;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendBuildGradleKts : java/lang/annotation/Annotation {
+	public abstract fun extension ()Ljava/lang/Class;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendBuildGradleKts$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/ExtendBuildGradleKts;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendGradleProperties : java/lang/annotation/Annotation {
+	public abstract fun extension ()Ljava/lang/Class;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendGradleProperties$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/ExtendGradleProperties;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendHotReloadTestDimension : java/lang/annotation/Annotation {
+	public abstract fun extension ()Ljava/lang/Class;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendHotReloadTestDimension$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/ExtendHotReloadTestDimension;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendProjectSetup : java/lang/annotation/Annotation {
+	public abstract fun extension ()Ljava/lang/Class;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendProjectSetup$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/ExtendProjectSetup;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendSettingsGradleKts : java/lang/annotation/Annotation {
+	public abstract fun extension ()Ljava/lang/Class;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ExtendSettingsGradleKts$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/ExtendSettingsGradleKts;
+}
+
+public abstract class org/jetbrains/compose/reload/test/gradle/GradleBuildEvent {
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Exit : org/jetbrains/compose/reload/test/gradle/GradleBuildEvent {
+	public synthetic fun <init> (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-dqgickI ()Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;
+	public final fun copy-44VadP4 (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Exit;
+	public static synthetic fun copy-44VadP4$default (Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Exit;Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Exit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode-dqgickI ()Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output : org/jetbrains/compose/reload/test/gradle/GradleBuildEvent {
+	public abstract fun getLine ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stderr : org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stderr;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stderr;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stderr;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getLine ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stdout : org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stdout;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stdout;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Output$Stdout;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getLine ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleBuildEvent$TaskStatus : org/jetbrains/compose/reload/test/gradle/GradleBuildEvent {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$TaskStatus;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$TaskStatus;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$TaskStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getStatus ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleBuildFlowKt {
+	public static final fun assertExit (Ljava/lang/Iterable;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$Exit;
+	public static final fun assertExitCode-wY0XULs (Ljava/lang/Iterable;Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;)Ljava/lang/Iterable;
+	public static final fun assertNoStatus (Ljava/lang/Iterable;Ljava/lang/String;)Ljava/lang/Iterable;
+	public static final fun assertSuccessful (Ljava/lang/Iterable;)Ljava/lang/Iterable;
+	public static final fun assertTaskExecuted (Ljava/lang/Iterable;Ljava/lang/String;)Ljava/lang/Iterable;
+	public static final fun assertTaskStatus (Ljava/lang/Iterable;Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/GradleBuildEvent$TaskStatus;
+	public static final fun assertTaskStatus (Ljava/lang/Iterable;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Iterable;
+	public static final fun assertTaskUpToDate (Ljava/lang/Iterable;Ljava/lang/String;)Ljava/lang/Iterable;
+	public static final fun buildFlow (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;[Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/GradlePropertiesExtension {
+	public abstract fun properties (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/util/List;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleRunner {
+	public final fun component1 ()Ljava/nio/file/Path;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/nio/file/Path;
+	public final fun copy (Ljava/nio/file/Path;Ljava/lang/String;Ljava/util/List;Ljava/nio/file/Path;Lkotlinx/coroutines/channels/Channel;Lkotlinx/coroutines/channels/Channel;)Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;Ljava/nio/file/Path;Ljava/lang/String;Ljava/util/List;Ljava/nio/file/Path;Lkotlinx/coroutines/channels/Channel;Lkotlinx/coroutines/channels/Channel;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArguments ()Ljava/util/List;
+	public final fun getGradleHome ()Ljava/nio/file/Path;
+	public final fun getGradleVersion ()Ljava/lang/String;
+	public final fun getProjectRoot ()Ljava/nio/file/Path;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode$Companion;
+	public static final synthetic fun box-impl (I)Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getValue ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode$Companion {
+	public final fun getFailure-SnSzujM ()I
+	public final fun getSuccess-SnSzujM ()I
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/GradleRunnerKt {
+	public static final fun assertSuccess-44VadP4 (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner$ExitCode;)V
+	public static final fun build (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;[Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun build (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;[Ljava/lang/String;Lkotlinx/coroutines/channels/SendChannel;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun build (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;[Ljava/lang/String;Lkotlinx/coroutines/channels/SendChannel;Lkotlinx/coroutines/channels/SendChannel;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun build$default (Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;[Ljava/lang/String;Lkotlinx/coroutines/channels/SendChannel;Lkotlinx/coroutines/channels/SendChannel;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/Headless : java/lang/annotation/Annotation {
+	public abstract fun isHeadless ()Z
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/HotReloadTest : java/lang/annotation/Annotation {
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public abstract fun displayName ()Ljava/lang/String;
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/HotReloadTestDimensionExtension {
+	public abstract fun getOrdinal ()I
+	public abstract fun transform (Lorg/junit/jupiter/api/extension/ExtensionContext;Ljava/util/List;)Ljava/util/List;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/HotReloadTestDimensionExtension$DefaultImpls {
+	public static fun getOrdinal (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestDimensionExtension;)I
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/HotReloadTestFixture : java/lang/AutoCloseable {
+	public field daemonTestScope Lkotlinx/coroutines/CoroutineScope;
+	public fun close ()V
+	public final fun getBuildMode ()Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public final fun getDaemonTestScope ()Lkotlinx/coroutines/CoroutineScope;
+	public final fun getGradleRunner ()Lorg/jetbrains/compose/reload/test/gradle/GradleRunner;
+	public final fun getLaunchMode ()Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public final fun getOrchestration ()Lorg/jetbrains/compose/reload/orchestration/OrchestrationServer;
+	public final fun getProjectDir ()Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;
+	public final fun getProjectMode ()Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public final fun getTestClassName ()Ljava/lang/String;
+	public final fun getTestMethodName ()Ljava/lang/String;
+	public final fun isDebug ()Z
+	public final fun launchTestDaemon (Lkotlin/coroutines/CoroutineContext;Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Deferred;
+	public static synthetic fun launchTestDaemon$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Lkotlin/coroutines/CoroutineContext;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lkotlinx/coroutines/Deferred;
+	public final fun runTest-VtjQ1oo (JLkotlin/jvm/functions/Function2;)V
+	public static synthetic fun runTest-VtjQ1oo$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;JLkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
+	public final fun runTransaction (Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun sendMessage (Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessage;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun setDaemonTestScope (Lkotlinx/coroutines/CoroutineScope;)V
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/HotReloadTestFixtureExtensionsKt {
+	public static final fun getDefaultMainKtSourceFile (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;)Ljava/lang/String;
+	public static final fun initialSourceCode (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun initialSourceCode (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun launchApplicationAndWait (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun launchApplicationAndWait$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun replaceSourceCode (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun replaceSourceCodeAndReload (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun replaceSourceCodeAndReload (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun replaceSourceCodeAndReload$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun requestAndAwaitReload (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun requestReload (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun sendTestEvent (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/io/Serializable;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sendTestEvent$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/io/Serializable;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext : org/jetbrains/kotlin/tooling/core/HasExtras, org/junit/jupiter/api/extension/TestTemplateInvocationContext {
+	public fun <init> (Lorg/jetbrains/kotlin/tooling/core/Extras;)V
+	public final fun component1 ()Lorg/jetbrains/kotlin/tooling/core/Extras;
+	public final fun copy (Lorg/jetbrains/kotlin/tooling/core/Extras;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;Lorg/jetbrains/kotlin/tooling/core/Extras;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAdditionalExtensions ()Ljava/util/List;
+	public final fun getAndroidVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;
+	public final fun getBuildMode ()Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public final fun getCompilerOptions ()Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions;
+	public final fun getComposeVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;
+	public final fun getDisplayName ()Ljava/lang/String;
+	public fun getDisplayName (I)Ljava/lang/String;
+	public fun getExtras ()Lorg/jetbrains/kotlin/tooling/core/Extras;
+	public final fun getGradleVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;
+	public final fun getKotlinVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;
+	public final fun getLaunchMode ()Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public final fun getProjectMode ()Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContextBuilder : org/jetbrains/kotlin/tooling/core/HasMutableExtras {
+	public fun <init> ()V
+	public fun <init> (Lorg/jetbrains/kotlin/tooling/core/MutableExtras;)V
+	public synthetic fun <init> (Lorg/jetbrains/kotlin/tooling/core/MutableExtras;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun compilerOption (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Z)V
+	public final fun getAndroidVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;
+	public final fun getBuildMode ()Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public final fun getCompilerOptions ()Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions;
+	public final fun getComposeVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;
+	public synthetic fun getExtras ()Lorg/jetbrains/kotlin/tooling/core/Extras;
+	public fun getExtras ()Lorg/jetbrains/kotlin/tooling/core/MutableExtras;
+	public final fun getGradleVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;
+	public final fun getKotlinVersion ()Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;
+	public final fun getLaunchMode ()Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public final fun getProjectMode ()Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public final fun setAndroidVersion (Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;)V
+	public final fun setBuildMode (Lorg/jetbrains/compose/reload/test/gradle/BuildMode;)V
+	public final fun setCompilerOptions (Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions;)V
+	public final fun setComposeVersion (Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;)V
+	public final fun setGradleVersion (Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;)V
+	public final fun setKotlinVersion (Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;)V
+	public final fun setLaunchMode (Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;)V
+	public final fun setProjectMode (Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;)V
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContextKt {
+	public static final fun HotReloadTestInvocationContext (Lkotlin/jvm/functions/Function1;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public static synthetic fun HotReloadTestInvocationContext$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public static final fun copy (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;Lkotlin/jvm/functions/Function1;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public static final fun getBuildMode (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+	public static final fun getCompilerOptions (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions;
+	public static final fun getHotReloadTestInvocationContext (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public static final fun getHotReloadTestInvocationContextOrThrow (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestInvocationContext;
+	public static final fun getLaunchMode (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+	public static final fun getProjectMode (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public static final fun getTestedAndroidVersion (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;
+	public static final fun getTestedComposeVersion (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;
+	public static final fun getTestedGradleVersion (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;
+	public static final fun getTestedKotlinVersion (Lorg/junit/jupiter/api/extension/ExtensionContext;)Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/JbrProvisioning : java/lang/annotation/Annotation {
+	public abstract fun autoProvisioningEnabled ()Z
+	public abstract fun gradleProvisioningEnabled ()Z
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/LaunchApplicationKt {
+	public static final fun launchApplication (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun launchApplication$default (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/MaxKotlinVersion : java/lang/annotation/Annotation {
+	public abstract fun version ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/MinComposeVersion : java/lang/annotation/Annotation {
+	public abstract fun version ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/MinKotlinVersion : java/lang/annotation/Annotation {
+	public abstract fun version ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/OverrideBuildGradleKts : java/lang/annotation/Annotation {
+	public abstract fun extension ()Ljava/lang/Class;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/OverrideBuildGradleKts$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/OverrideBuildGradleKts;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ProjectDir {
+	public fun <init> (Ljava/nio/file/Path;Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;)V
+	public synthetic fun <init> (Ljava/nio/file/Path;Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/nio/file/Path;
+	public final fun component2 ()Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;
+	public final fun copy (Ljava/nio/file/Path;Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;)Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;Ljava/nio/file/Path;Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBuildGradleKts ()Ljava/nio/file/Path;
+	public final fun getGradleProperties ()Ljava/nio/file/Path;
+	public final fun getParent ()Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;
+	public final fun getPath ()Ljava/nio/file/Path;
+	public final fun getSettingsGradleKts ()Ljava/nio/file/Path;
+	public fun hashCode ()I
+	public final fun resolve (Ljava/lang/String;)Ljava/nio/file/Path;
+	public final fun subproject (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ProjectDirKt {
+	public static final fun replaceText (Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static final fun writeText (Lorg/jetbrains/compose/reload/test/gradle/ProjectDir;Ljava/lang/String;Ljava/lang/String;)V
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ProjectMode : java/lang/Enum, org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/ProjectMode$Companion;
+	public static final field Jvm Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public static final field Kmp Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public fun displayName ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public fun toString ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+	public static fun values ()[Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ProjectMode$Companion {
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/ProjectModeKt {
+	public static final fun fold (Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/ProjectSetupExtension {
+	public abstract fun setupProject (Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;Lorg/junit/jupiter/api/extension/ExtensionContext;)V
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/ReloadEffects : java/lang/annotation/Annotation {
+	public abstract fun isEnabled ()Z
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension {
+	public abstract fun dependencyResolutionManagement (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun dependencyResolutionManagementRepositories (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun footer (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun header (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun pluginManagement (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun pluginManagementPlugins (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun pluginManagementRepositories (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public abstract fun plugins (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension$DefaultImpls {
+	public static fun dependencyResolutionManagement (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun dependencyResolutionManagementRepositories (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun footer (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun header (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun pluginManagement (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun pluginManagementPlugins (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun pluginManagementRepositories (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+	public static fun plugins (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public abstract interface class org/jetbrains/compose/reload/test/gradle/SettingsGradleKtsRepositoriesExtension {
+	public abstract fun repositories (Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/SettingsGradleKtsRepositoriesExtension$DefaultImpls {
+	public static fun repositories (Lorg/jetbrains/compose/reload/test/gradle/SettingsGradleKtsRepositoriesExtension;Lorg/junit/jupiter/api/extension/ExtensionContext;)Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/SkikoUtilsKt {
+	public static final fun compare (Lorg/jetbrains/skia/Image;Lorg/jetbrains/skia/Image;FI)Lorg/jetbrains/skia/Image;
+	public static synthetic fun compare$default (Lorg/jetbrains/skia/Image;Lorg/jetbrains/skia/Image;FIILjava/lang/Object;)Lorg/jetbrains/skia/Image;
+	public static final fun diff (Lorg/jetbrains/skia/Image;Lorg/jetbrains/skia/Image;)Lorg/jetbrains/skia/Image;
+	public static final fun readImage (Ljava/nio/file/Path;)Lorg/jetbrains/skia/Image;
+	public static final fun readImage ([B)Lorg/jetbrains/skia/Image;
+	public static final fun withPaint (Lorg/jetbrains/skia/Image;Lkotlin/jvm/functions/Function1;)Lorg/jetbrains/skia/Image;
+	public static final fun withPaint (Lorg/jetbrains/skia/Image;Lorg/jetbrains/skia/Paint;)Lorg/jetbrains/skia/Image;
+	public static final fun writeImage (Ljava/nio/file/Path;Lorg/jetbrains/skia/Image;)V
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedAndroidVersion : org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;
+	public fun displayName ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedAndroidVersion$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/TestedAndroidVersion;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TestedBuildMode : java/lang/annotation/Annotation {
+	public abstract fun mode ()Lorg/jetbrains/compose/reload/test/gradle/BuildMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TestedBuildMode$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/TestedBuildMode;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedCompilerOptions : java/util/Map, kotlin/jvm/internal/markers/KMappedMarker, org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions$Companion;
+	public fun clear ()V
+	public synthetic fun compute (Ljava/lang/Object;Ljava/util/function/BiFunction;)Ljava/lang/Object;
+	public fun compute (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/util/function/BiFunction;)Ljava/lang/Boolean;
+	public synthetic fun computeIfAbsent (Ljava/lang/Object;Ljava/util/function/Function;)Ljava/lang/Object;
+	public fun computeIfAbsent (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/util/function/Function;)Ljava/lang/Boolean;
+	public synthetic fun computeIfPresent (Ljava/lang/Object;Ljava/util/function/BiFunction;)Ljava/lang/Object;
+	public fun computeIfPresent (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/util/function/BiFunction;)Ljava/lang/Boolean;
+	public final fun containsKey (Ljava/lang/Object;)Z
+	public fun containsKey (Lorg/jetbrains/compose/reload/test/core/CompilerOption;)Z
+	public final fun containsValue (Ljava/lang/Object;)Z
+	public fun containsValue (Z)Z
+	public fun displayName ()Ljava/lang/String;
+	public final fun entrySet ()Ljava/util/Set;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun get (Ljava/lang/Object;)Ljava/lang/Boolean;
+	public final synthetic fun get (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun get (Lorg/jetbrains/compose/reload/test/core/CompilerOption;)Ljava/lang/Boolean;
+	public fun getEntries ()Ljava/util/Set;
+	public fun getKeys ()Ljava/util/Set;
+	public fun getSize ()I
+	public fun getValues ()Ljava/util/Collection;
+	public fun hashCode ()I
+	public fun isEmpty ()Z
+	public final fun keySet ()Ljava/util/Set;
+	public synthetic fun merge (Ljava/lang/Object;Ljava/lang/Object;Ljava/util/function/BiFunction;)Ljava/lang/Object;
+	public fun merge (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/lang/Boolean;Ljava/util/function/BiFunction;)Ljava/lang/Boolean;
+	public synthetic fun put (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+	public fun put (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Z)Ljava/lang/Boolean;
+	public fun putAll (Ljava/util/Map;)V
+	public synthetic fun putIfAbsent (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+	public fun putIfAbsent (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/lang/Boolean;)Ljava/lang/Boolean;
+	public fun remove (Ljava/lang/Object;)Ljava/lang/Boolean;
+	public synthetic fun remove (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun remove (Ljava/lang/Object;Ljava/lang/Object;)Z
+	public synthetic fun replace (Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+	public synthetic fun replace (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z
+	public fun replace (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/lang/Boolean;)Ljava/lang/Boolean;
+	public fun replace (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Ljava/lang/Boolean;Ljava/lang/Boolean;)Z
+	public fun replaceAll (Ljava/util/function/BiFunction;)V
+	public final fun size ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun values ()Ljava/util/Collection;
+	public final fun with (Lorg/jetbrains/compose/reload/test/core/CompilerOption;Z)Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedCompilerOptions$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/TestedCompilerOptions;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedComposeVersion : org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion$Companion;
+	public fun <init> (Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;)V
+	public final fun component1 ()Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;
+	public final fun copy (Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;)Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;
+	public fun displayName ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersion ()Lorg/jetbrains/compose/reload/test/gradle/ComposeVersion;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedComposeVersion$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/TestedComposeVersion;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedGradleVersion : org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;Ljava/lang/String;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;
+	public fun displayName ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedGradleVersion$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/TestedGradleVersion;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedKotlinVersion : org/jetbrains/compose/reload/test/gradle/HotReloadTestDimension {
+	public static final field Companion Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion$Companion;
+	public fun <init> (Lorg/jetbrains/kotlin/tooling/core/KotlinToolingVersion;)V
+	public final fun component1 ()Lorg/jetbrains/kotlin/tooling/core/KotlinToolingVersion;
+	public final fun copy (Lorg/jetbrains/kotlin/tooling/core/KotlinToolingVersion;)Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;
+	public static synthetic fun copy$default (Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;Lorg/jetbrains/kotlin/tooling/core/KotlinToolingVersion;ILjava/lang/Object;)Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;
+	public fun displayName ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersion ()Lorg/jetbrains/kotlin/tooling/core/KotlinToolingVersion;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TestedKotlinVersion$Companion {
+	public final fun getDefault ()Lorg/jetbrains/compose/reload/test/gradle/TestedKotlinVersion;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TestedLaunchMode : java/lang/annotation/Annotation {
+	public abstract fun mode ()Lorg/jetbrains/compose/reload/test/gradle/ApplicationLaunchMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TestedLaunchMode$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/TestedLaunchMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TestedProjectMode : java/lang/annotation/Annotation {
+	public abstract fun mode ()Lorg/jetbrains/compose/reload/test/gradle/ProjectMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TestedProjectMode$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/TestedProjectMode;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/TransactionDslMarker : java/lang/annotation/Annotation {
+}
+
+public final class org/jetbrains/compose/reload/test/gradle/TransactionScope : kotlinx/coroutines/CoroutineScope {
+	public final fun awaitAck (Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun awaitApplicationStart (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun awaitReload (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getCoroutineContext ()Lkotlin/coroutines/CoroutineContext;
+	public final fun getFixture ()Lorg/jetbrains/compose/reload/test/gradle/HotReloadTestFixture;
+	public final fun getLogger ()Lorg/jetbrains/compose/reload/core/Logger;
+	public final fun getMessage ()Lkotlinx/coroutines/channels/ReceiveChannel;
+	public final fun getSharedMessages ()Lkotlinx/coroutines/flow/SharedFlow;
+	public final fun initialSourceCode (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun launchApplicationAndWait (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun launchApplicationAndWait$default (Lorg/jetbrains/compose/reload/test/gradle/TransactionScope;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun launchChildTransaction (Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun launchDaemon (Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;
+	public final fun launchDevApplicationAndWait (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun launchDevApplicationAndWait$default (Lorg/jetbrains/compose/reload/test/gradle/TransactionScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun pullMessages ()Ljava/util/List;
+	public final fun replaceSourceCode (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun replaceSourceCode (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun replaceSourceCodeAndReload (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun replaceSourceCodeAndReload$default (Lorg/jetbrains/compose/reload/test/gradle/TransactionScope;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun requestAndAwaitReload (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun requestReload (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun send (Lorg/jetbrains/compose/reload/orchestration/OrchestrationMessage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun sync (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun writeCode (Ljava/lang/String;Ljava/lang/String;)Ljava/nio/file/Path;
+	public static synthetic fun writeCode$default (Lorg/jetbrains/compose/reload/test/gradle/TransactionScope;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/nio/file/Path;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/WithGradleProperty : java/lang/annotation/Annotation {
+	public abstract fun key ()Ljava/lang/String;
+	public abstract fun value ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/WithGradleProperty$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/WithGradleProperty;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/WithHotReloadProperty : java/lang/annotation/Annotation {
+	public abstract fun property ()Lorg/jetbrains/compose/reload/core/HotReloadProperty;
+	public abstract fun value ()Ljava/lang/String;
+}
+
+public abstract interface annotation class org/jetbrains/compose/reload/test/gradle/WithHotReloadProperty$Container : java/lang/annotation/Annotation {
+	public abstract fun value ()[Lorg/jetbrains/compose/reload/test/gradle/WithHotReloadProperty;
+}
+

@@ -1,0 +1,841 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+@file:Suppress("DuplicatedCode", "FunctionName")
+
+package org.jetbrains.compose.reload.tests
+
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessage
+import org.jetbrains.compose.reload.test.gradle.AndroidHotReloadTest
+import org.jetbrains.compose.reload.test.gradle.DisabledVersion
+import org.jetbrains.compose.reload.test.gradle.HotReloadTest
+import org.jetbrains.compose.reload.test.gradle.HotReloadTestFixture
+import org.jetbrains.compose.reload.test.gradle.MinKotlinVersion
+import org.jetbrains.compose.reload.test.gradle.checkScreenshot
+import org.jetbrains.compose.reload.test.gradle.initialSourceCode
+import org.jetbrains.compose.reload.test.gradle.replaceSourceCode
+import org.jetbrains.compose.reload.test.gradle.replaceSourceCodeAndReload
+import org.jetbrains.compose.reload.test.gradle.sendTestEvent
+import org.jetbrains.compose.reload.utils.GradleIntegrationTest
+import org.jetbrains.compose.reload.utils.HostIntegrationTest
+import org.jetbrains.compose.reload.utils.TestOnlyAndroid
+import org.jetbrains.compose.reload.utils.TestOnlyDefaultComposeVersion
+
+class ScreenshotTests {
+
+    @HotReloadTest
+    fun `test - simple change`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.ui.unit.sp
+            import androidx.compose.ui.window.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    TestText("Hello")
+                }
+            }
+            """.trimIndent()
+        fixture.checkScreenshot("before")
+
+        fixture.replaceSourceCodeAndReload("Hello", "Goodbye")
+        fixture.checkScreenshot("after")
+    }
+
+    @GradleIntegrationTest
+    @HostIntegrationTest
+    @DisabledVersion("#128: ComposableSingleton + Indy", kotlin = "2.2.0")
+    @HotReloadTest
+    fun `test - retained state`(fixture: HotReloadTestFixture) = fixture.runTest {
+        val d = "$"
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.material3.*
+            import androidx.compose.ui.unit.*
+            import androidx.compose.ui.window.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    var state by remember { mutableStateOf(0) }
+                    onTestEvent {
+                        state++
+                    }
+                    
+                    Group {
+                        TestText("Before: ${d}state")
+                    }
+                }
+            }
+            """.trimIndent()
+        fixture.checkScreenshot("before-0")
+
+        fixture.sendTestEvent()
+        fixture.checkScreenshot("before-1")
+
+        fixture.sendTestEvent()
+        fixture.checkScreenshot("before-2")
+
+        fixture.replaceSourceCodeAndReload("Before", "After")
+        fixture.checkScreenshot("after-2")
+    }
+
+    @AndroidHotReloadTest
+    @TestOnlyAndroid
+    fun `test - kmp with android and jvm`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.ui.unit.sp
+            import androidx.compose.ui.window.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    TestText("Hello")
+                }
+            }
+            """.trimIndent()
+        fixture.checkScreenshot("before")
+
+        fixture.replaceSourceCodeAndReload("Hello", "Goodbye")
+        fixture.checkScreenshot("after")
+    }
+
+    @DisabledVersion("#128: ComposableSingleton + Indy", kotlin = "2.2.0")
+    @HotReloadTest
+    fun `test - add button`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.material3.*
+            import androidx.compose.ui.unit.*
+            import androidx.compose.ui.window.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    Column {
+                        TestText("Initial")
+                        // Add button
+                    }
+                }
+            }
+            """.trimIndent()
+        fixture.checkScreenshot("0-before")
+
+        fixture.replaceSourceCodeAndReload(
+            """// Add button""", """
+                Button(onClick = { }) {
+                    TestText("Button")
+                }
+            """.trimIndent()
+        )
+        fixture.checkScreenshot("1-withButton")
+    }
+
+
+    @DisabledVersion("#128: ComposableSingleton + Indy", kotlin = "2.2.0")
+    @HotReloadTest
+    fun `test - add remembered state`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.material3.*
+            import androidx.compose.ui.unit.*
+            import androidx.compose.ui.window.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    // add state
+                    
+                    // add effect
+                    
+                    Column {
+                        TestText("Initial")
+                        // Add button
+                    }
+                }
+            }
+            """.trimIndent()
+        fixture.checkScreenshot("0-before")
+
+        fixture.replaceSourceCodeAndReload("""// add state""", """var state by remember { mutableStateOf(0) }""")
+        fixture.checkScreenshot("1-addedState")
+
+        fixture.replaceSourceCodeAndReload(""""Initial"""", """"State: %state"""".replace("%", "$"))
+        fixture.checkScreenshot("2-renderState")
+
+        fixture.replaceSourceCodeAndReload("""// add effect""", """onTestEvent { state++ }""")
+        fixture.checkScreenshot("3-addedEffect")
+
+        fixture.sendTestEvent {
+            fixture.checkScreenshot("4-afterEvent")
+        }
+    }
+
+    @DisabledVersion("#128: ComposableSingleton + Indy", kotlin = "2.2.0")
+    @HotReloadTest
+    fun `test - update remembered value`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.material3.*
+            import androidx.compose.ui.unit.*
+            import androidx.compose.ui.window.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    var state by remember { mutableStateOf(0) }
+                    onTestEvent { state++ }
+                    Group {
+                        TestText("Before: %state")
+                    }
+                }
+            }
+            """.trimIndent().replace("%", "$")
+        fixture.checkScreenshot("0-before")
+
+        fixture.sendTestEvent()
+        fixture.checkScreenshot("1-afterEvent")
+
+        fixture.replaceSourceCodeAndReload("Before:", "After:")
+        fixture.checkScreenshot("2-afterSimpleCodeChange")
+
+        fixture.replaceSourceCodeAndReload("mutableStateOf(0)", "mutableStateOf(42)")
+        fixture.checkScreenshot("3-afterChangeInsideRememberBlock")
+    }
+
+    @HotReloadTest
+    fun `test - change lambda from non-capturing to capturing`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.material3.*
+            import androidx.compose.ui.unit.*
+            import androidx.compose.ui.window.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() {
+                screenshotTestApplication {
+                    var state by remember { mutableStateOf(0) }
+                   
+                    val myLambda = {
+                        // lambda body
+                        sendLog("run: myLambda")
+                        sendTestEvent("run: myLambda")
+                    }
+                    
+                    onTestEvent { value ->
+                        if(value == "inc") myLambda() 
+                     }
+                    
+                    TestText("%state")
+                }
+            }
+            """.trimIndent().replace("%", "$")
+        fixture.checkScreenshot("0-before")
+
+        fixture.sendTestEvent("inc")
+        fixture.checkScreenshot("0-before")
+
+        fixture.replaceSourceCodeAndReload("// lambda body", "state++")
+
+
+        fixture.sendTestEvent("inc") {
+            skipToMessage<OrchestrationMessage.TestEvent> { event ->
+                event.payload == "run: myLambda"
+            }
+        }
+
+        fixture.checkScreenshot("1-afterLambdaEngaged")
+    }
+
+    @HotReloadTest
+    fun `test - change lambda from non-capturing to capturing - wrapper`(
+        fixture: HotReloadTestFixture
+    ) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            @Composable fun Wrapper(child: @Composable () -> Unit) {
+                child()
+            }
+            
+            @Composable fun Actor(
+                onEvent: () -> Unit, 
+                child: @Composable () -> Unit,
+            ) {
+                onTestEvent { onEvent() }
+                child()
+            }
+            
+            fun main() = screenshotTestApplication {
+                var state by remember { mutableStateOf(0) }
+                Wrapper {
+                    Actor(onEvent = { /* lambda body */ }) {
+                        TestText("%state")
+                     }
+                }
+            }
+            """.trimIndent().replace("%", "$")
+
+        fixture.checkScreenshot("0-before-0")
+
+        fixture.sendTestEvent()
+        fixture.checkScreenshot("1-afterEventWithoutAction-0")
+
+        fixture.replaceSourceCodeAndReload("/* lambda body */", "state++")
+        fixture.checkScreenshot("2-afterLambdaEngaged-0")
+
+        fixture.sendTestEvent()
+        fixture.checkScreenshot("3-afterEventWithLambdaEngaged-1")
+    }
+
+    @HotReloadTest
+    fun `test - add top level value`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.material3.*
+            import androidx.compose.ui.unit.*
+            import org.jetbrains.compose.reload.test.*
+            
+            val foo = 42
+            // add field
+            
+            fun main() {
+                screenshotTestApplication {
+                   TestText("%foo")
+                }
+            }
+            """.trimIndent().replace("%", "$")
+        fixture.checkScreenshot("0-before")
+
+        fixture.runTransaction {
+            fixture.replaceSourceCode("// add field", "val bar = 1902")
+            fixture.replaceSourceCode("\$foo", "\$bar")
+            requestAndAwaitReload()
+        }
+
+        fixture.checkScreenshot("1-after")
+    }
+
+    @HotReloadTest
+    fun `test - changing spacedBy`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.Arrangement
+            import androidx.compose.foundation.layout.Row
+            import androidx.compose.foundation.layout.fillMaxWidth
+            import androidx.compose.runtime.Composable
+            import androidx.compose.ui.Modifier
+            import androidx.compose.ui.unit.dp
+            import org.jetbrains.compose.reload.test.*
+
+
+            fun main() {
+                screenshotTestApplication {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp) ,
+                    ) {
+                        TestText("A")
+                        TestText("B")
+                    }
+                }
+            }
+
+            """.trimIndent().replace("%", "$")
+        fixture.checkScreenshot("0-before")
+
+        /* Increase value passed to 'spacedBy' */
+        fixture.replaceSourceCodeAndReload("spacedBy(6.dp)", "spacedBy(32.dp)")
+        fixture.checkScreenshot("1-larger-spacedBy")
+    }
+
+    @HotReloadTest
+    fun `test - change in canvas draw coordinates`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.Canvas
+            import androidx.compose.foundation.layout.Box
+            import androidx.compose.foundation.layout.fillMaxSize
+            import androidx.compose.foundation.layout.size
+            import androidx.compose.foundation.progressSemantics
+            import androidx.compose.runtime.Composable
+            import androidx.compose.ui.Alignment
+            import androidx.compose.ui.Modifier
+            import androidx.compose.ui.geometry.Offset
+            import androidx.compose.ui.graphics.Color
+            import androidx.compose.ui.unit.dp
+            import org.jetbrains.compose.reload.test.*
+              
+            fun main() = screenshotTestApplication {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Canvas(
+                       Modifier
+                       .progressSemantics()
+                       .size(200.dp, 200.dp)
+                    ) {
+                        drawLine(
+                            color = Color.Black,
+                            Offset(0f, 0f),
+                            Offset(50f, 0f),
+                            20f,
+                        )
+                   }
+               }
+            }
+         """.trimIndent()
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.replaceSourceCodeAndReload("Offset(50f, 0f)", "Offset(200f, 0f)")
+        fixture.checkScreenshot("1-after")
+    }
+
+    @HotReloadTest
+    fun `test - remember in two composables`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+              
+            fun main() = screenshotTestApplication {
+                Column {
+                    Foo()
+                }
+            }
+            
+            @Composable
+            fun Foo() {
+                var foo by remember { mutableStateOf(0) }
+                onTestEvent { value ->
+                    if(value == "foo") foo++
+                }
+                TestText("Foo: %foo")
+                Bar()
+            }
+            
+            @Composable
+            fun Bar() {
+                var bar by remember { mutableStateOf(0) }
+                onTestEvent { value ->
+                    if(value == "bar") bar++
+                }
+                TestText("Bar: %bar")
+            }
+         """.trimIndent().replace("%", "$")
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.sendTestEvent("foo")
+        fixture.checkScreenshot("1-foo_1-bar_0")
+
+        fixture.sendTestEvent("foo")
+        fixture.checkScreenshot("2-foo_2-bar_0")
+
+        fixture.sendTestEvent("bar")
+        fixture.checkScreenshot("3-foo_2-bar_1")
+
+        fixture.replaceSourceCodeAndReload(
+            "var bar by remember { mutableStateOf(0) }",
+            "var bar by remember { mutableStateOf(24) }"
+        )
+        fixture.checkScreenshot("4-foo_2-bar_24-afterReload")
+    }
+
+
+    @HotReloadTest
+    fun `test - change line numbers - by adding whitespace`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+              
+            fun main() = screenshotTestApplication {
+                Column {
+                    Foo()
+                }
+            }
+            
+            fun decoy() {
+                //add whitespace
+            }
+            
+            @Composable
+            fun Foo() {
+                var foo by remember { mutableStateOf(0) }
+                onTestEvent { value ->
+                    if(value == "foo") foo++
+                }
+                TestText("Foo: %foo")
+            }
+         """.trimIndent().replace("%", "$")
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.sendTestEvent("foo")
+        fixture.checkScreenshot("1-foo_1")
+
+        fixture.replaceSourceCodeAndReload("//add whitespace", "\n\n\n\n")
+        fixture.checkScreenshot("2-foo_1")
+    }
+
+    @HotReloadTest
+    fun `test - change line numbers - by adding whitespace and code`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+              
+            fun main() = screenshotTestApplication {
+                Column {
+                    Foo()
+                }
+            }
+            
+            fun decoy() {
+                //add whitespace
+            }
+            
+            @Composable
+            fun Foo() {
+                var foo by remember { mutableStateOf(0) }
+                onTestEvent { value ->
+                    if(value == "foo") foo++
+                }
+                TestText("Foo: %foo")
+            }
+         """.trimIndent().replace("%", "$")
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.sendTestEvent("foo")
+        fixture.checkScreenshot("1-foo_1")
+
+        fixture.replaceSourceCodeAndReload(
+            "//add whitespace", """
+            |
+            |
+            | println("new code")
+            | 
+            """.trimMargin()
+        )
+        fixture.checkScreenshot("2-foo_1")
+    }
+
+    @HotReloadTest
+    @MinKotlinVersion("2.2.20-dev-7701") // https://github.com/JetBrains/compose-hot-reload/issues/220
+    fun `test - add decoy function above`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            // add decoy
+            
+            @Composable
+            fun Foo() {
+                var state by remember { mutableStateOf(0) }
+                onTestEvent { value ->  if(value == "inc") state++ }
+                TestText("A: %state")
+            }
+            
+            fun main() = screenshotTestApplication {
+                Foo()
+            }
+        
+        """.trimIndent().replace("%", "$")
+
+        repeat(3) { sendTestEvent("inc") }
+        checkScreenshot("3-inc")
+
+        replaceSourceCodeAndReload(
+            "// add decoy", """
+            @Composable
+            fun Decoy() {
+                TestText("Decoy")
+            }
+            """.trimIndent()
+        )
+        checkScreenshot("3-inc")
+
+        sendTestEvent("inc")
+        checkScreenshot("4-inc")
+    }
+
+    @HotReloadTest
+    fun `test - if branch`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+              
+            fun main() = screenshotTestApplication {
+                Column {
+                    Foo(true)
+                }
+            }
+            
+            @Composable
+            fun Foo(value: Boolean) {
+                if(value) {
+                    var state by remember { mutableStateOf(0) }
+                    onTestEvent { value -> if(value == "inc") state++ }
+                    TestText("Foo: %state")
+                } else {
+                    TestText("Value is 'false'")
+                }
+            }
+        """.replace("%", "$").trimIndent()
+
+        fixture.checkScreenshot("0-true-0")
+        fixture.sendTestEvent("inc")
+        fixture.checkScreenshot("1-true-1")
+
+        fixture.replaceSourceCodeAndReload(
+            "Foo(true)", """
+            | 
+            | Foo(
+            |    true
+            | )
+        """.trimMargin()
+        )
+        fixture.checkScreenshot("2-afterWhitespaceChangeInMain-true-1")
+
+        fixture.replaceSourceCodeAndReload("""Value is 'false'""", """Value is <false>""")
+        fixture.checkScreenshot("3-afterChangeInElse-true-1")
+
+        fixture.replaceSourceCodeAndReload(
+            """
+            | Foo(
+            |    true
+            | )
+            """.trimMargin(), """Foo(false)"""
+        )
+        fixture.checkScreenshot("4-false-0")
+    }
+
+    @HotReloadTest
+    fun `test - add enum case`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            enum class Tab {
+                A, 
+                B,
+                // add C entry
+            }
+              
+            fun main() = screenshotTestApplication {
+                var tab by remember { mutableStateOf(Tab.A) }
+                onTestEvent { value -> 
+                    tab = Tab.valueOf(value.toString())
+                }
+                
+                when(tab) {
+                    Tab.A -> TestText("A")
+                    Tab.B -> TestText("B")
+                    // add C case
+                }                
+            }
+           
+         """.trimIndent().replace("%", "$")
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.runTransaction {
+            replaceSourceCode("// add C entry", "C,")
+            replaceSourceCode("// add C case", "Tab.C -> TestText(\"C\")")
+            requestAndAwaitReload()
+        }
+        fixture.checkScreenshot("1-after-c-added")
+
+        fixture.sendTestEvent("C")
+        fixture.checkScreenshot("2-after-c-selected")
+    }
+
+    @HotReloadTest
+    fun `test - change in static field`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            val foo = 42
+          
+            fun main() = screenshotTestApplication {
+                val state by remember { mutableStateOf(foo) }
+                TestText("state: %state")
+            }
+         """.trimIndent().replace("%", "$")
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.replaceSourceCodeAndReload("val foo = 42", "val foo = 1902")
+        fixture.checkScreenshot("1-after-foo-changed")
+    }
+
+    @HotReloadTest
+    fun `test - eager return`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            @Composable
+            fun Value(): String? {
+                return "value: 0"
+            }
+          
+            fun main() = screenshotTestApplication {
+                val value = Value() ?: return@screenshotTestApplication
+                Column {
+                    TestText(value)
+                    TestText("Foo: A")
+                }
+            }
+        """.trimIndent()
+
+        fixture.checkScreenshot("0-before")
+
+        fixture.replaceSourceCodeAndReload("Foo: A", "Foo: B")
+        fixture.checkScreenshot("1-after-Foo-B")
+
+        fixture.replaceSourceCodeAndReload("value: 0", "value: 1")
+        fixture.checkScreenshot("2-after-value-1")
+    }
+
+    @HotReloadTest
+    @TestOnlyDefaultComposeVersion
+    fun `test - 222 - isolated change in ComposableSingleton`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() = screenshotTestApplication {
+                Column {
+                    Group {
+                        var state by remember { mutableStateOf(0) }
+                        onTestEvent { value ->  if(value == "incA") state++ }
+                        TestText("A: %state")
+                    }
+                    
+                    Group {
+                        var state by remember { mutableStateOf(0) }
+                        onTestEvent { value ->  if(value == "incB") state++ }
+                        TestText("B: %state")
+                    }                    
+                }
+            }
+        
+        """.trimIndent().replace("%", "$")
+
+        checkScreenshot("0-before")
+
+        /* Send 3 increments to A and 5 increments to B */
+        repeat(3) { sendTestEvent("incA") }
+        repeat(5) { sendTestEvent("incB") }
+        checkScreenshot("1-A3-B5")
+
+        replaceSourceCodeAndReload("A: ", "A-after: ")
+        checkScreenshot("2-reloaded-A-A0-B5")
+
+    }
+
+
+    @HotReloadTest
+    @TestOnlyDefaultComposeVersion
+    fun `test - 222 - adding new ComposableSingleton lambda`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+            
+            fun main() = screenshotTestApplication {
+                Column {
+                    Group {
+                        var state by remember { mutableStateOf(0) }
+                        onTestEvent { value ->  if(value == "inc") state++ }
+                        TestText("A: %state")
+                    }              
+                }
+            }
+            
+            @Composable
+            fun Decoy() {
+                // decoy body
+            }
+        
+        """.trimIndent().replace("%", "$")
+
+        repeat(3) { sendTestEvent("inc") }
+        checkScreenshot("A3")
+
+        replaceSourceCodeAndReload("// decoy body", "Group {}")
+        checkScreenshot("A3")
+    }
+
+    /**
+     * Group keys inside branches are currently computed using offset. Meaning any change in the method
+     * is causing the group key to change, which leads to the whole method recomposing. This test only
+     * captures the current behaviour. If the group keys inside the method become stable, we will be
+     * able to preserve the state in this test case.
+     */
+    @HotReloadTest
+    fun `test - switch control flow`(fixture: HotReloadTestFixture) = fixture.runTest {
+        fixture initialSourceCode """
+            import androidx.compose.foundation.layout.*
+            import androidx.compose.runtime.*
+            import org.jetbrains.compose.reload.test.*
+              
+            fun main() = screenshotTestApplication {
+                Column {
+                    Foo(10)
+                }
+            }
+            
+            @Composable
+            fun Foo(value: Int) {
+                when (value) {
+                    0 -> {
+                        TestText("Before")
+                    }
+                    10 -> {
+                        var state by remember { mutableStateOf(0) }
+                        onTestEvent { value -> if(value == "inc") state++ }
+                        TestText("Foo: %state")
+                    }
+                    else -> {
+                        TestText("After")
+                    }
+                }
+            }
+        """.replace("%", "$").trimIndent()
+
+        fixture.checkScreenshot("0-10-0")
+        fixture.sendTestEvent("inc")
+        fixture.checkScreenshot("1-10-1")
+
+        fixture.replaceSourceCodeAndReload("TestText(\"After\")", "TestText(\"After updated\")")
+        fixture.checkScreenshot("2-10-change after-0")
+
+        fixture.sendTestEvent("inc")
+        fixture.checkScreenshot("3-10-1")
+
+        fixture.replaceSourceCodeAndReload("TestText(\"Before\")", "TestText(\"Before updated\")")
+        fixture.checkScreenshot("4-10-change before-0")
+
+        fixture.replaceSourceCodeAndReload("Foo(10)", "Foo(0)")
+        fixture.checkScreenshot("5-0-0")
+    }
+
+}

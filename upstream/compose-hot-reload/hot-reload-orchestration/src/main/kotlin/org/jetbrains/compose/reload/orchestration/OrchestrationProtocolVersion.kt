@@ -1,0 +1,90 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+package org.jetbrains.compose.reload.orchestration
+
+import org.jetbrains.compose.reload.core.Try
+import org.jetbrains.compose.reload.core.toLeft
+import org.jetbrains.compose.reload.core.toRight
+
+@Deprecated("Use 'OrchestrationVersion' instead.", ReplaceWith("OrchestrationVersion"))
+public enum class OrchestrationProtocolVersion(public val intValue: Int) {
+    V1(1),
+    V1_1(2),
+    V1_2(3),
+    V1_3(4),
+    V1_4(5),
+    V1_5(6)
+    ;
+
+    @Suppress("DEPRECATION")
+    public companion object {
+        internal const val serialVersionUID: Long = 0L
+
+        public val current: OrchestrationProtocolVersion get() = V1_2
+
+        public fun from(intValue: Int): Try<OrchestrationProtocolVersion> {
+            entries.firstOrNull { it.intValue == intValue }?.let { return it.toLeft() }
+            return IllegalArgumentException("Unknown protocol version: $intValue").toRight()
+        }
+    }
+}
+
+public data class OrchestrationVersion(public val intValue: Int) : Comparable<OrchestrationVersion> {
+    public companion object {
+        public val v1: OrchestrationVersion = OrchestrationVersion(1)
+        public val v1_1: OrchestrationVersion = OrchestrationVersion(2)
+        public val v1_2: OrchestrationVersion = OrchestrationVersion(3)
+        public val v1_3: OrchestrationVersion = OrchestrationVersion(4)
+        public val v1_4: OrchestrationVersion = OrchestrationVersion(5)
+        public val v1_5: OrchestrationVersion = OrchestrationVersion(6)
+        public val v1_6: OrchestrationVersion = OrchestrationVersion(7)
+        public val current: OrchestrationVersion = v1_6
+    }
+
+    override fun compareTo(other: OrchestrationVersion): Int {
+        return this.intValue.compareTo(other.intValue)
+    }
+
+    override fun toString(): String {
+        return when (this) {
+            v1 -> "v1($intValue)"
+            v1_1 -> "v1.1($intValue)"
+            v1_2 -> "v1.2($intValue)"
+            v1_3 -> "v1.3($intValue)"
+            v1_4 -> "v1.4($intValue)"
+            v1_5 -> "v1.5($intValue)"
+            v1_6 -> "v1.6($intValue)"
+            else -> "N/A($intValue)"
+        }
+    }
+}
+
+internal val OrchestrationVersion.supportsStates: Boolean
+    get() = this >= OrchestrationVersion.v1_1
+
+internal val OrchestrationVersion.supportsOpaqueMessages: Boolean
+    get() = this >= OrchestrationVersion.v1_2
+
+internal val OrchestrationVersion.supportsEncodedMessages: Boolean
+    get() = this >= OrchestrationVersion.v1_4
+
+internal val OrchestrationMessage.availableSinceVersion: OrchestrationVersion
+    get() = javaClass.availableSinceVersion
+
+internal val Class<out OrchestrationMessage>.availableSinceVersion: OrchestrationVersion
+    get() = when (this) {
+        OrchestrationMessage.InvalidatedComposeGroupMessage::class.java -> OrchestrationVersion.v1_2
+        OrchestrationMessage.RestartRequest::class.java -> OrchestrationVersion.v1_3
+        OrchestrationMessage.ScreenshotRequest::class.java -> OrchestrationVersion.v1_5
+        OrchestrationMessage.ScreenshotResult::class.java -> OrchestrationVersion.v1_5
+        OrchestrationMessage.SemanticTreeRequest::class.java -> OrchestrationVersion.v1_5
+        OrchestrationMessage.SemanticTreeResult::class.java -> OrchestrationVersion.v1_5
+        OrchestrationMessage.UIActionRequest::class.java -> OrchestrationVersion.v1_5
+        OrchestrationMessage.UIActionResult::class.java -> OrchestrationVersion.v1_5
+        OrchestrationMessage.WindowResizeRequest::class.java -> OrchestrationVersion.v1_6
+        OrchestrationMessage.WindowResizeResult::class.java -> OrchestrationVersion.v1_6
+        else -> OrchestrationVersion.v1
+    }

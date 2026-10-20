@@ -1,0 +1,88 @@
+Classfile <bytecode path>
+  Last modified <Date>; size 549 bytes
+  SHA-256 checksum 4d57b106c7129e3920b0dfdb28dfa9fed6bf5c4e2165e9687d045573a110f4e8
+  Compiled from "Test.kt"
+public final class TestKt
+  minor version: 0
+  major version: 52
+  flags: (0x0031) ACC_PUBLIC, ACC_FINAL, ACC_SUPER
+  this_class: #2                          // TestKt
+  super_class: #4                         // java/lang/Object
+  interfaces: 0, fields: 1, methods: 3, attributes: 2
+Constant pool:
+   #1 = Utf8               TestKt
+   #2 = Class              #1             // TestKt
+   #3 = Utf8               java/lang/Object
+   #4 = Class              #3             // java/lang/Object
+   #5 = Utf8               getEmpty
+   #6 = Utf8               ()I
+   #7 = Utf8               empty
+   #8 = Utf8               I
+   #9 = NameAndType        #7:#8          // empty:I
+  #10 = Fieldref           #2.#9          // TestKt.empty:I
+  #11 = Utf8               foo
+  #12 = Utf8               ()V
+  #13 = Utf8               <clinit>
+  #14 = Utf8               Lkotlin/Metadata;
+  #15 = Utf8               mv
+  #16 = Integer            2
+  #17 = Integer            1
+  #18 = Integer            0
+  #19 = Utf8               k
+  #20 = Utf8               xi
+  #21 = Integer            48
+  #22 = Utf8               d1
+  #23 = Utf8               \u0000\u0010\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0000\u001a\u0006\u0010\u0004\u001a\u00020\u0005\"\u0014\u0010\u0000\u001a\u00020\u0001X\u0086D¢\u0006\b\n\u0000\u001a\u0004\b\u0002\u0010\u0003¨\u0006\u0006
+  #24 = Utf8               d2
+  #25 = Utf8
+  #26 = Utf8               testModule
+  #27 = Utf8               Test.kt
+  #28 = Utf8               Code
+  #29 = Utf8               LineNumberTable
+  #30 = Utf8               SourceFile
+  #31 = Utf8               RuntimeVisibleAnnotations
+{
+  private static final int empty;
+    descriptor: I
+    flags: (0x001a) ACC_PRIVATE, ACC_STATIC, ACC_FINAL
+
+  public static final int getEmpty();
+    descriptor: ()I
+    flags: (0x0019) ACC_PUBLIC, ACC_STATIC, ACC_FINAL
+    Code:
+      stack=1, locals=0, args_size=0
+         0: getstatic     #10                 // Field empty:I
+         3: ireturn
+      LineNumberTable:
+        line 1: 0
+
+  public static final void foo();
+    descriptor: ()V
+    flags: (0x0019) ACC_PUBLIC, ACC_STATIC, ACC_FINAL
+    Code:
+      stack=0, locals=0, args_size=0
+         0: return
+      LineNumberTable:
+        line 2: 0
+
+  static {};
+    descriptor: ()V
+    flags: (0x0008) ACC_STATIC
+    Code:
+      stack=1, locals=0, args_size=0
+         0: bipush        42
+         2: putstatic     #10                 // Field empty:I
+         5: return
+      LineNumberTable:
+        line 1: 0
+}
+SourceFile: "Test.kt"
+RuntimeVisibleAnnotations:
+  0: #14(#15=[I#16,I#17,I#18],#19=I#16,#20=I#21,#22=[s#23],#24=[s#7,s#25,s#5,s#6,s#11,s#25,s#26])
+    kotlin.Metadata(
+      mv=[2,1,0]
+      k=2
+      xi=48
+      d1=["\u0000\u0010\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0000\u001a\u0006\u0010\u0004\u001a\u00020\u0005\"\u0014\u0010\u0000\u001a\u00020\u0001X\u0086D¢\u0006\b\n\u0000\u001a\u0004\b\u0002\u0010\u0003¨\u0006\u0006"]
+      d2=["empty","","getEmpty","()I","foo","","testModule"]
+    )

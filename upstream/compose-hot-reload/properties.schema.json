@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "patternProperties": {
+    "^[A-Za-z0-9_]+$": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "default": {
+          "type": "string"
+        },
+        "defaultIsExpression": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["int", "long", "string", "boolean", "file", "files", "enum"]
+        },
+        "enumClass": {
+          "type": "string"
+        },
+        "target": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["build", "devtools", "application"]
+          }
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "delicate", "experimental", "internal", "deprecated"]
+        },
+        "deprecationMessage": {
+          "type": "string"
+        },
+        "documentation": {
+          "type": "string"
+        }
+      },
+      "required": ["key", "type", "target"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

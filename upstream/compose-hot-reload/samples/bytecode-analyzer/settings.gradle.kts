@@ -1,0 +1,40 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+pluginManagement {
+    plugins {
+        id("org.jetbrains.compose.hot-reload") version "1.3.0-alpha+225"
+    }
+
+    repositories {
+        maven(file("../..//build/repo"))
+        maven("https://packages.jetbrains.team/maven/p/firework/dev")
+        mavenCentral {
+            setUrl("https://cache-redirector.jetbrains.com/maven-central")
+        }
+        gradlePluginPortal()
+    }
+
+    plugins {
+        kotlin("multiplatform") version "2.3.21"
+        kotlin("plugin.compose") version "2.3.21"
+        id("org.jetbrains.compose") version "1.10.0"
+    }
+}
+
+plugins {
+    id("org.jetbrains.compose.hot-reload.test.jbr-resolver-convention") version "1.3.0-alpha+225"
+}
+
+dependencyResolutionManagement {
+    repositories {
+        maven(file("../..//build/repo"))
+        maven("https://packages.jetbrains.team/maven/p/firework/dev")
+        mavenCentral {
+            setUrl("https://cache-redirector.jetbrains.com/maven-central")
+        }
+        google()
+    }
+}

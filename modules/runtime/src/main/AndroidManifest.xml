@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Starts the runtime before 'Application.onCreate' (the counterpart of the agent's 'premain') -->
+        <provider
+            android:name="org.jetbrains.compose.reload.android.AndroidHotReloadInitializer"
+            android:authorities="${applicationId}.compose-hot-reload"
+            android:exported="false"
+            android:initOrder="1000" />
+    </application>
+</manifest>

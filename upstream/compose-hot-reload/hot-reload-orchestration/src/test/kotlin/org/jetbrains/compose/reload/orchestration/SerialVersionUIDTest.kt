@@ -1,0 +1,92 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+package org.jetbrains.compose.reload.orchestration
+
+import org.jetbrains.compose.reload.analysis.ClassId
+import org.jetbrains.compose.reload.core.testFixtures.sanitized
+import org.jetbrains.compose.reload.orchestration.utils.walkClasspath
+import org.jetbrains.compose.reload.test.core.InternalHotReloadTestApi
+import org.jetbrains.compose.reload.test.core.TestEnvironment
+import java.io.Serializable
+import java.lang.reflect.Modifier
+import kotlin.io.path.Path
+import kotlin.io.path.createParentDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
+import kotlin.reflect.jvm.kotlinProperty
+import kotlin.reflect.typeOf
+import kotlin.test.Test
+import kotlin.test.fail
+
+class SerialVersionUIDTest {
+
+    @OptIn(InternalHotReloadTestApi::class)
+    @Test
+    fun `test - each serializable class has a serialVersionUID`() {
+
+        val violations = mutableListOf<String>()
+        val serialVersionUIDs = mutableMapOf<String, Long>()
+
+        walkClasspath { node ->
+            if (!node.name.startsWith("org/jetbrains/compose/reload/orchestration")) return@walkClasspath
+            val javaClass = Class.forName(ClassId(node).toFqn())
+            // Starting from 2.3.x some compiler-generated classes also implement java.io.Serializable
+            // We filter them out here
+            if (javaClass.isAnonymousClass || javaClass.isLocalClass || javaClass.isSynthetic) return@walkClasspath
+            if (!Serializable::class.java.isAssignableFrom(javaClass)) return@walkClasspath
+            val thisClass = javaClass.kotlin
+            val serialVersionUID = thisClass.java.fields.find { it.name == "serialVersionUID" }
+            if (serialVersionUID == null) {
+                violations.add("$thisClass: Missing 'serialVersionUID'")
+                return@walkClasspath
+            }
+
+            if (serialVersionUID.modifiers and Modifier.STATIC == 0) {
+                violations.add("$thisClass: 'serialVersionUID' should be static")
+            }
+
+            if (!serialVersionUID.kotlinProperty!!.isConst) {
+                violations.add("$thisClass: 'serialVersionUID' should be a const")
+            }
+
+            if (!serialVersionUID.kotlinProperty!!.isConst) {
+                violations.add("$thisClass: 'serialVersionUID' should be a const")
+            }
+
+            if (serialVersionUID.kotlinProperty!!.returnType != typeOf<Long>()) {
+                violations.add("$thisClass: 'serialVersionUID' should be a Long")
+            }
+
+            serialVersionUIDs.put(node.name, serialVersionUID.kotlinProperty!!.call(null) as Long)
+        }
+
+        if (violations.isNotEmpty()) fail(violations.joinToString("\n"))
+
+        val expectFile = Path("src/test/resources/testData/serialVersionUIDs.txt")
+        expectFile.createParentDirectories()
+
+        val actualText = serialVersionUIDs.entries.sortedBy { it.key }
+            .joinToString("\n") { "${it.key} = ${it.value}" }
+            .sanitized()
+
+
+        if (!expectFile.exists() || TestEnvironment.updateTestData) {
+            expectFile.writeText(actualText)
+            if (!TestEnvironment.updateTestData) fail("${expectFile.toUri()} did not exist; Generated")
+        }
+
+        if (expectFile.readText().sanitized() != actualText) {
+            val actualFile = expectFile.resolveSibling(
+                expectFile.nameWithoutExtension + "-actual." + expectFile.extension
+            )
+            actualFile.writeText(actualText)
+            fail("${expectFile.toUri()} did not match\n${actualFile.toUri()}")
+        }
+    }
+}

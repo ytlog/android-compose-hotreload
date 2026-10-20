@@ -1,0 +1,189 @@
+/*
+ * Copyright 2024-2025 JetBrains s.r.o. and Compose Hot Reload contributors.
+ * Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+ */
+
+package org.jetbrains.compose.reload.agent
+
+import org.jetbrains.compose.reload.InternalHotReloadApi
+import org.jetbrains.compose.reload.analysis.ClassId
+import org.jetbrains.compose.reload.analysis.ComposeGroupKey
+import org.jetbrains.compose.reload.analysis.Ids
+import org.jetbrains.compose.reload.analysis.ScopeType
+import org.jetbrains.compose.reload.core.createLogger
+import org.jetbrains.compose.reload.core.debug
+import org.jetbrains.compose.reload.core.isFailure
+import org.jetbrains.compose.reload.core.warn
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.InvalidatedComposeGroupMessage
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.InvalidatedComposeGroupMessage.DirtyScope
+import java.lang.instrument.ClassFileTransformer
+import java.lang.reflect.InvocationTargetException
+import java.lang.instrument.Instrumentation
+import java.security.ProtectionDomain
+import java.util.WeakHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.InvalidatedComposeGroupMessage.DirtyScope.ScopeType as DirtyScopeType
+
+private val logger = createLogger()
+
+private val composeClassLoadersLock = ReentrantLock()
+private val composeClassLoaders = WeakHashMap<ClassLoader, Unit>()
+
+internal fun launchComposeInstrumentation(instrumentation: Instrumentation) {
+    launchComposeGroupInvalidation()
+    instrumentation.addTransformer(ComposeTransformer)
+}
+
+private object ComposeTransformer : ClassFileTransformer {
+    override fun transform(
+        loader: ClassLoader?, className: String?,
+        classBeingRedefined: Class<*>?, protectionDomain: ProtectionDomain?, classfileBuffer: ByteArray?
+    ): ByteArray? {
+        val classId = ClassId(className ?: return null)
+        if (!classId.isTransformAllowed()) return null
+
+        if (classId != Ids.Recomposer.classId &&
+            classId != Ids.Composer.classId
+        ) return null
+
+        composeClassLoadersLock.withLock {
+            val loader = loader ?: ClassLoader.getSystemClassLoader()
+            if (composeClassLoaders.put(loader, Unit) == null) {
+                /* put returning null -> loader was not known before, so we can setup copose */
+                runOnUiThreadAsync {
+                    enableComposeHotReloadMode(loader)
+                }
+            }
+        }
+
+        return null
+    }
+}
+
+private fun launchComposeGroupInvalidation() {
+
+    /*
+    Instruct Compose to invalidate groups that have changed, after successful reload.
+     */
+    invokeAfterHotReload { reloadRequestId, result ->
+        if (result.isFailure()) return@invokeAfterHotReload
+
+        val invalidations = result.value.dirty.dirtyScopes
+            .filter { scope -> scope.group != null }
+            .groupBy { it.group }
+
+        invalidations.forEach { (group, scopes) ->
+            if (group == null) return@forEach
+
+            val methods = scopes.map { it.methodId }.toSet()
+                .joinToString(", ", prefix = "(", postfix = ")") { methodId ->
+                    "${methodId.classId}.${methodId.methodName}"
+                }
+            val dirtyScopes = scopes.map { scope ->
+                val scopeType = when (scope.scopeType) {
+                    ScopeType.Method -> DirtyScopeType.Method
+                    ScopeType.RestartGroup -> DirtyScopeType.RestartGroup
+                    ScopeType.ReplaceGroup -> DirtyScopeType.ReplaceGroup
+                    ScopeType.SourceInformationMarker -> DirtyScopeType.SourceInformationMarker
+                }
+                DirtyScope(
+                    scopeType = scopeType,
+                    sourceFile = scope.sourceLocation.sourceFile,
+                    classId = scope.methodId.classId.value,
+                    methodName = scope.methodId.methodName,
+                    methodDescriptor = scope.methodId.methodDescriptor,
+                    firstLineNumber = scope.sourceLocation.firstLineNumber,
+                )
+            }
+
+            logger.debug("Invalidating group '${group.key}' $methods")
+            invalidateGroupsWithKey(group)
+
+            InvalidatedComposeGroupMessage(
+                groupKey = group.key,
+                dirtyScopes = dirtyScopes,
+            ).sendAsync()
+        }
+    }
+}
+
+private fun enableComposeHotReloadMode(loader: ClassLoader) {
+    try {
+        val recomposerClass = loader.loadClass(Ids.Recomposer.classId.toFqn())
+        val recomposerCompanion = recomposerClass.getField(Ids.Recomposer.companion.fieldName).get(null)
+        val recomposerCompanionClass = loader.loadClass(Ids.Recomposer.Companion.classId.toFqn())
+        recomposerCompanionClass.methods
+            .singleOrNull { it.name.contains("setHotReloadEnabled") }
+            ?.apply { invoke(recomposerCompanion, true) }
+
+        logger.debug("'setHotReloadEnabled' method found, enabled compose hot reload mode (${loader.name})")
+    } catch (e: ReflectiveOperationException) {
+        logger.warn("Failed to enable compose hot reload mode (${loader.name})", e)
+    }
+}
+
+private fun invalidateGroupsWithKey(key: ComposeGroupKey) {
+    composeClassLoadersLock.withLock {
+        composeClassLoaders.keys.forEach { loader ->
+            invalidateGroupsWithKey(loader, key)
+        }
+    }
+}
+
+private fun invalidateGroupsWithKey(loader: ClassLoader, key: ComposeGroupKey) {
+    val recomposerClass = loader.loadClass(Ids.Recomposer.classId.toFqn())
+    val recomposerCompanion = recomposerClass.getField(Ids.Recomposer.companion.fieldName).get(null)
+    val recomposerCompanionClass = loader.loadClass(Ids.Recomposer.Companion.classId.toFqn())
+
+    recomposerCompanionClass.methods
+        .singleOrNull { it.name.contains("invalidateGroupsWithKey") }
+        ?.apply { invoke(recomposerCompanion, key.key) }
+}
+
+/**
+ * Forces a full composition teardown and rebuild ("hard" reload).
+ *
+ * Unlike [invalidateGroupsWithKey] — which only invalidates changed groups and, crucially, *skips*
+ * any recomposer whose current error is non-recoverable — this disposes every running recomposer's
+ * compositions and recomposes them from scratch (Compose's 'saveStateAndDisposeForHotReload' followed
+ * by 'loadStateAndComposeForHotReload', which resets all error states).
+ */
+@InternalHotReloadApi
+fun reloadCompositionState() {
+    runOnUiThreadBlocking {
+        composeClassLoadersLock.withLock {
+            composeClassLoaders.keys.forEach { loader -> reloadCompositionState(loader) }
+        }
+    }
+}
+
+private fun reloadCompositionState(loader: ClassLoader) {
+    val recomposerClass = loader.loadClass(Ids.Recomposer.classId.toFqn())
+    val recomposerCompanion = recomposerClass.getField(Ids.Recomposer.companion.fieldName).get(null)
+    val recomposerCompanionClass = loader.loadClass(Ids.Recomposer.Companion.classId.toFqn())
+
+    val save = recomposerCompanionClass.methods
+        .singleOrNull { it.name.contains("saveStateAndDisposeForHotReload") }
+    val load = recomposerCompanionClass.methods
+        .singleOrNull { it.name.contains("loadStateAndComposeForHotReload") }
+
+    if (save == null || load == null) {
+        logger.warn("'saveStateAndDisposeForHotReload'/'loadStateAndComposeForHotReload' not found (${loader.name})")
+        return
+    }
+
+    val token = try {
+        save.invoke(recomposerCompanion)
+    } catch (t: InvocationTargetException) {
+        logger.warn("'saveStateAndDisposeForHotReload' failed", t.cause ?: t)
+        return
+    }
+
+    try {
+        load.invoke(recomposerCompanion, token)
+    } catch (t: InvocationTargetException) {
+        logger.warn("'loadStateAndComposeForHotReload' completed with a trailing error", t.cause ?: t)
+    }
+}
+

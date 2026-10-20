@@ -1,0 +1,71 @@
+[versions]
+kotlin = "2.3.21"
+compose = "1.11.1"
+composeMin = { prefer = "1.10.0" }
+composeMaterial3 = "1.9.0"
+coroutines = "1.11.0"
+kotlinxDatetime = "0.8.0"
+kotlinxBenchmark = "0.4.17"
+kotlinxBinaryCompatibilityValidator = "0.18.1"
+kotlinxSerialization = "1.11.0"
+kotlinxLincheck = "3.6"
+androidGradlePlugin = "8.11.1"
+junit = "5.14.1"
+javassist = "3.30.2-GA"
+asm = "9.10.1"
+evas = "1.4.0"
+ktor = "3.5.0"
+shadow = "9.4.2"
+mcpKotlinSdk = "0.13.0"
+kaml = "0.104.0"
+skiko = "0.148.2"
+gradlePluginPublish = "2.0.0"
+
+[libraries]
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+
+benchmark-runtime = { module = "org.jetbrains.kotlinx:kotlinx-benchmark-runtime", version.ref = "kotlinxBenchmark" }
+benchmark-gradlePlugin = { module = "org.jetbrains.kotlinx:kotlinx-benchmark-plugin", version.ref = "kotlinxBenchmark" }
+
+binaryCompatibilityValidator-gradlePlugin = { module = "org.jetbrains.kotlinx:binary-compatibility-validator", version.ref = "kotlinxBinaryCompatibilityValidator" }
+
+kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinxSerialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinxSerialization-kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }
+
+lincheck = { module = "org.jetbrains.lincheck:lincheck", version.ref = "kotlinxLincheck" }
+
+evas = { module = "io.sellmair:evas", version.ref = "evas" }
+evas-compose = { module = "io.sellmair:evas-compose", version.ref = "evas" }
+
+compose-gradlePlugin = { module = "org.jetbrains.compose:org.jetbrains.compose.gradle.plugin", version.ref = "compose" }
+compose-compiler-gradlePlugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+compose-icons-core = { module = "org.jetbrains.compose.material:material-icons-core", version = "1.7.3" }
+
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMin" }
+compose-desktop-common = { module = "org.jetbrains.compose.desktop:desktop", version.ref = "composeMin" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "composeMaterial3" }
+compose-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMin" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMin" }
+
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+javassist = { module = "org.javassist:javassist", version.ref = "javassist" }
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+asm-util = { module = "org.ow2.asm:asm-util", version.ref = "asm" }
+
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+
+mcp-kotlin-sdk-server = { module = "io.modelcontextprotocol:kotlin-sdk-server", version.ref = "mcpKotlinSdk" }
+mcp-kotlin-sdk-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlinSdk" }
+
+shadow-gradlePlugin = { module = "com.gradleup.shadow:shadow-gradle-plugin", version.ref = "shadow" }
+pluginPublish-gradlePlugin = { module = "com.gradle.plugin-publish:com.gradle.plugin-publish.gradle.plugin", version.ref = "gradlePluginPublish" }
+
+skiko-awt = { module = "org.jetbrains.skiko:skiko-awt", version.ref = "skiko" }

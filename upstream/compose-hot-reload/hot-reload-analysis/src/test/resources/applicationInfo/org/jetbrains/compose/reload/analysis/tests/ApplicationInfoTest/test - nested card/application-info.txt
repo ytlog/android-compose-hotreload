@@ -1,0 +1,157 @@
+/*
+ Original Code:
+*/
+
+// Foo.kt
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+
+@Composable
+fun Foo() {
+    Card {
+        Text("First Text")
+        Text("Second Text")
+        Card {
+            Text("Inner A")
+            Text("Inner B")
+        }
+    }
+}
+
+/*
+ Application Info:
+*/
+
+ComposableSingletons$FooKt {
+    val INSTANCE: LComposableSingletons$FooKt;
+    val lambda$1969856002: Lkotlin/jvm/functions/Function3;
+    val lambda$904522804: Lkotlin/jvm/functions/Function3;
+
+    <clinit> {
+        desc: ()V
+        type: Regular
+        Method {
+            key: null
+            codeHash: 1079242724
+            methodDependencies: [
+                ComposableSingletons$FooKt.<init> ()V,
+                ComposableSingletons$FooKt.lambda_1969856002$lambda$0 (Landroidx/compose/foundation/layout/ColumnScope;Landroidx/compose/runtime/Composer;I)Lkotlin/Unit;,
+                ComposableSingletons$FooKt.lambda_904522804$lambda$0 (Landroidx/compose/foundation/layout/ColumnScope;Landroidx/compose/runtime/Composer;I)Lkotlin/Unit;
+            ]
+            fieldDependencies: [
+                ComposableSingletons$FooKt.lambda$1969856002 Lkotlin/jvm/functions/Function3;,
+                ComposableSingletons$FooKt.lambda$904522804 Lkotlin/jvm/functions/Function3;,
+                ComposableSingletons$FooKt.INSTANCE LComposableSingletons$FooKt;
+            ]
+        }
+    }
+    
+    
+    <init> {
+        desc: ()V
+        type: Regular
+        Method {
+            key: null
+            codeHash: 1355809367
+            methodDependencies: []
+            fieldDependencies: []
+        }
+    }
+    
+    
+    getLambda$1969856002$testModule {
+        desc: ()Lkotlin/jvm/functions/Function3;
+        type: Regular
+        Method {
+            key: null
+            codeHash: 1114701777
+            methodDependencies: []
+            fieldDependencies: [
+                ComposableSingletons$FooKt.lambda$1969856002 Lkotlin/jvm/functions/Function3;
+            ]
+        }
+    }
+    
+    
+    getLambda$904522804$testModule {
+        desc: ()Lkotlin/jvm/functions/Function3;
+        type: Regular
+        Method {
+            key: null
+            codeHash: 1738765666
+            methodDependencies: []
+            fieldDependencies: [
+                ComposableSingletons$FooKt.lambda$904522804 Lkotlin/jvm/functions/Function3;
+            ]
+        }
+    }
+    
+    
+    lambda_1969856002$lambda$0 {
+        desc: (Landroidx/compose/foundation/layout/ColumnScope;Landroidx/compose/runtime/Composer;I)Lkotlin/Unit;
+        type: Composable
+        Method {
+            key: 1969856002
+            codeHash: 3916160333
+            methodDependencies: []
+            fieldDependencies: []
+        }
+    }
+    
+    
+    lambda_904522804$lambda$0 {
+        desc: (Landroidx/compose/foundation/layout/ColumnScope;Landroidx/compose/runtime/Composer;I)Lkotlin/Unit;
+        type: Composable
+        Method {
+            key: 904522804
+            codeHash: 4029857084
+            methodDependencies: []
+            fieldDependencies: [
+                ComposableSingletons$FooKt.lambda$1969856002 Lkotlin/jvm/functions/Function3;,
+                ComposableSingletons$FooKt.INSTANCE LComposableSingletons$FooKt;
+            ]
+        }
+    }
+}
+
+FooKt {
+    Foo {
+        desc: (Landroidx/compose/runtime/Composer;I)V
+        type: Composable
+        Method {
+            key: -965539098
+            codeHash: 3924881808
+            methodDependencies: [
+                FooKt.Foo$lambda$0 (ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
+            ]
+            fieldDependencies: []
+    
+            RestartGroup {
+                key: -965539098
+                codeHash: 860999037
+                methodDependencies: [
+                    ComposableSingletons$FooKt.getLambda$904522804$testModule ()Lkotlin/jvm/functions/Function3;
+                ]
+                fieldDependencies: [
+                    ComposableSingletons$FooKt.INSTANCE LComposableSingletons$FooKt;
+                ]
+            }
+        }
+    }
+    
+    
+    Foo$lambda$0 {
+        desc: (ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
+        type: Composable
+        Method {
+            key: null
+            codeHash: 210770274
+            methodDependencies: [
+                FooKt.Foo (Landroidx/compose/runtime/Composer;I)V
+            ]
+            fieldDependencies: []
+        }
+    }
+}

@@ -1,0 +1,12 @@
+public final class org/jetbrains/compose/reload/HotReloadApi {
+	public static final fun AfterHotReloadEffect (Lkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
+	public static final fun DevelopmentEntryPoint (Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getStaticHotReloadScope ()Lorg/jetbrains/compose/reload/HotReloadScope;
+	public static final fun isHotReloadActive ()Z
+}
+
+public abstract class org/jetbrains/compose/reload/HotReloadScope {
+	public static final field $stable I
+	public abstract fun invokeAfterHotReload (Lkotlin/jvm/functions/Function0;)Ljava/lang/AutoCloseable;
+}
+
