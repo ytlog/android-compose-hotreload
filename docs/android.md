@@ -62,7 +62,7 @@ ANDROID_HOME=$HOME/Library/Android/sdk ./gradlew prepareUpstream
 
 `hotRunDebug` 会先安装 APK，再启动主机进程。主机进程负责启动应用，生命周期与应用绑定：应用退出，主机就结束；主机被停止或收到 `ShutdownRequest`，应用也随之退出。这与上游 `hotRun` 的行为一致。
 
-接入其他工程的完整配置见 [首页接入步骤](../README.md#接入已有工程)：在 `pluginManagement` 和 settings 顶层引入本仓库的根构建，并在插件仓库、依赖仓库中加入准备好的本地 Maven 仓库。然后在应用模块现有的 `plugins` 中添加热重载插件：
+接入其他工程的完整配置见 [中文接入步骤](../README.zh-CN.md#接入已有工程)：在 `pluginManagement` 和 settings 顶层引入本仓库的根构建，并在插件仓库、依赖仓库中加入准备好的本地 Maven 仓库。然后在应用模块现有的 `plugins` 中添加热重载插件：
 
 ```kotlin
 plugins {
