@@ -148,7 +148,7 @@ internal fun Context.reload(
     val dex = dexer.dex(plans.values.flatMap { it.classes.entries }.associate { it.key to it.value })
     val staticsOnly = statics.additionalDefinitions.mapTo(HashSet()) { it.classId.toFqn() }
 
-    val groups = dirty.dirtyScopes.mapNotNull { it.group?.key }.distinct().toIntArray()
+    val groups = composeInvalidation(index.currentApplicationInfo, attempt.pending, dirty.dirtyScopes)
     val deviceRequestId = UUID.randomUUID().toString()
     onDeviceRequest(deviceRequestId)
     val result = device.reload(
@@ -160,8 +160,9 @@ internal fun Context.reload(
                 Protocol.ClassDefinition(className, bytes, primary in staticsOnly)
             },
             statics.reinitialize.map { it.toFqn() },
-            groups,
+            groups.reset,
             resourceApk,
+            groups.recompose,
         )
     )
 

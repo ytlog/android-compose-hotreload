@@ -26,7 +26,7 @@ public final class Protocol {
     }
 
     public static final int MAGIC = 0x43485241; // 'CHRA'
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
     public static final int MAX_FRAME_SIZE = 512 * 1024 * 1024;
 
     /* Host -> Device */
@@ -98,6 +98,8 @@ public final class Protocol {
         /** Classes whose statics shall be re-initialized, in execution order */
         public final List<String> reinitializeStatics;
         public final int[] invalidatedGroupKeys;
+        /** Unchanged scope trees whose dependencies changed: recompose without discarding slots. */
+        public final int[] recomposedGroupKeys;
         /** Optional APK containing resources and assets, without executable code. */
         public final byte[] resourceApk;
 
@@ -112,10 +114,18 @@ public final class Protocol {
             String reloadRequestId, List<ClassDefinition> definitions,
             List<String> reinitializeStatics, int[] invalidatedGroupKeys, byte[] resourceApk
         ) {
+            this(reloadRequestId, definitions, reinitializeStatics, invalidatedGroupKeys, resourceApk, new int[0]);
+        }
+
+        public Reload(
+            String reloadRequestId, List<ClassDefinition> definitions,
+            List<String> reinitializeStatics, int[] invalidatedGroupKeys, byte[] resourceApk, int[] recomposedGroupKeys
+        ) {
             this.reloadRequestId = reloadRequestId;
             this.definitions = definitions;
             this.reinitializeStatics = reinitializeStatics;
             this.invalidatedGroupKeys = invalidatedGroupKeys;
+            this.recomposedGroupKeys = recomposedGroupKeys;
             this.resourceApk = resourceApk;
         }
 
@@ -134,6 +144,8 @@ public final class Protocol {
             for (int key : invalidatedGroupKeys) out.writeInt(key);
             out.writeBoolean(resourceApk != null);
             if (resourceApk != null) writeBytes(out, resourceApk);
+            out.writeInt(recomposedGroupKeys.length);
+            for (int key : recomposedGroupKeys) out.writeInt(key);
         }
 
         static Reload read(DataInputStream in) throws IOException {
@@ -147,7 +159,9 @@ public final class Protocol {
             int[] groups = new int[readCount(in)];
             for (int i = 0; i < groups.length; i++) groups[i] = in.readInt();
             byte[] resourceApk = in.readBoolean() ? readBytes(in) : null;
-            return new Reload(id, definitions, reinitialize, groups, resourceApk);
+            int[] recompose = new int[readCount(in)];
+            for (int i = 0; i < recompose.length; i++) recompose[i] = in.readInt();
+            return new Reload(id, definitions, reinitialize, groups, resourceApk, recompose);
         }
     }
 

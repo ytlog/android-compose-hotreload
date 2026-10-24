@@ -42,6 +42,17 @@ public class ProtocolTest {
         assertTrue(reload.definitions.get(1).staticsOnly);
         assertEquals(Collections.singletonList("a.A"), reload.reinitializeStatics);
         assertArrayEquals(new int[]{42, -7}, reload.invalidatedGroupKeys);
+        assertArrayEquals(new int[0], reload.recomposedGroupKeys);
+    }
+
+    @Test
+    public void preserveUnchangedScopeSlots() throws IOException {
+        Protocol.Reload reload = (Protocol.Reload) roundTrip(new Protocol.Reload(
+            "mixed", Collections.emptyList(), Collections.emptyList(), new int[]{17}, new byte[]{4}, new int[]{42, -7}
+        ));
+        assertArrayEquals(new int[]{17}, reload.invalidatedGroupKeys);
+        assertArrayEquals(new int[]{42, -7}, reload.recomposedGroupKeys);
+        assertArrayEquals(new byte[]{4}, reload.resourceApk);
     }
 
     @Test
@@ -106,6 +117,20 @@ public class ProtocolTest {
             fail("Expected IOException");
         } catch (IOException expected) {
             assertTrue(expected.getMessage().contains("count"));
+        }
+    }
+
+    @Test
+    public void rejectsPreviousProtocolVersion() throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeInt(Protocol.MAGIC);
+        out.writeInt(Protocol.VERSION - 1);
+        try {
+            Protocol.readHandshake(new ByteArrayInputStream(bytes.toByteArray()));
+            fail("Expected version mismatch");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("Unsupported protocol version"));
         }
     }
 

@@ -33,9 +33,9 @@ def main():
         str(REPOSITORY / 'gradlew'), ':hot-reload-android-host:prepareWorkflowProbe', '--console=plain'
     ], cwd=REPOSITORY, check=True)
     classpath = (REPOSITORY / 'modules/host/build/workflow-probe/classpath.txt').read_text()
-    evidence = regression.SAMPLE / 'build/device-test-evidence' / f'workflow-{time.time_ns()}'
+    evidence = REPOSITORY / 'build/evidence' / f'workflow-{time.time_ns()}'
     evidence.mkdir(parents=True)
-    print(f'Evidence: {evidence}', flush=True)
+    print(f'Evidence: {evidence.relative_to(REPOSITORY)}', flush=True)
     original = regression.MAIN.read_text()
     environment = dict(os.environ, ANDROID_SERIAL=args.serial)
     results = []

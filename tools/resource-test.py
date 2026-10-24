@@ -47,9 +47,9 @@ def main():
     library = sample / 'lib/src/main/res/values/hot_reload.xml'
     paths = [values, icon, bitmap, raw, asset, manifest, qualified, library, regression.MAIN]
     originals = {path: path.read_bytes() for path in paths}
-    evidence = sample / 'build/device-test-evidence' / f'resources-{time.time_ns()}'
+    evidence = sample.parent / 'build/evidence' / f'resources-{time.time_ns()}'
     evidence.mkdir(parents=True)
-    print(f'Evidence: {evidence}', flush=True)
+    print(f'Evidence: {evidence.relative_to(sample.parent)}', flush=True)
     results = []
     host_pid = None
     regression.HOST_LOG.unlink(missing_ok=True)

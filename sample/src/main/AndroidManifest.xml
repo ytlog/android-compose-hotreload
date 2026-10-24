@@ -3,6 +3,7 @@
     <application
         android:label="Hot Reload Sample"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".StateEditActivity" android:exported="true" android:launchMode="singleTop" />
         <activity android:name=".RealEditActivity" android:exported="true" android:launchMode="singleTop" />
         <activity
             android:name=".MainActivity"

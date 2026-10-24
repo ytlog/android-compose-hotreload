@@ -28,15 +28,22 @@ For manual use, run `./sample/gradlew -p sample hotRunDebug`, then open the page
 | `rendering` | Change text, add and interact with a component, then remove it |
 | `callbacks` | Keep the initial listener; insert zero/same-capture lambdas; edit its body; add/reorder/remove/restore reference and primitive captures; reject ambiguous insertion and retry |
 | `recovery` | Reject making a live ViewModel abstract with companion business and capture-layout edits, check old calls, retry, then add a class and update its caller |
-| `full` | Execute all groups consecutively in one process |
+| `compose-state` | Reorder keyed components and sections; insert, reorder, remove and add lazy-list items; edit a row label; reject and recover a batch while preserving state |
+| `compose-recovery` | Run only the row-label/rejection/retry tail of `compose-state` to localize failures |
+| `refactoring` | Change Kotlin/Java parameters and return descriptors, append a result class, move a helper between files, rename a Java method, reject/retry a mixed batch and restore original signatures on the retained service |
+| `full` | Execute all groups consecutively in one process, then return to the original page and call its retained listeners |
 
 The runner types into the real TextField and selects a detail. It checks the process, ViewModel and listener identities, draft, selection, operation count an unrelated `remember` scope and exact factory/callback counts. The initial listener and its reference anchor are immutable; a separately created control closure never replaces them. Every step requests GC and backgrounds/resumes the same Activity. It checks installed APK and native library hashes against the local AAR and records source and artifact provenance.
 
-Sources are temporarily edited and restored on exit. Commit or back up work first, and never run two source-editing scripts in the same checkout concurrently. An existing `EditFormatter.kt` is never overwritten. Raw logs, source diffs, UI snapshots, screenshots and reports stay in ignored `build/evidence/`.
+Sources are temporarily edited and restored on exit. Commit or back up work first, and never run two source-editing scripts in the same checkout concurrently. Existing generated fixture files are never overwritten. Kotlin and Java ClassFiles and their hashes are saved for each update. Raw logs, source diffs, UI snapshots, screenshots and reports stay in ignored `build/evidence/`.
 
 A new listener's success does not prove that an old registered listener works, especially after adding captures. Retain failing runs. Reload timings include compilation and transport and are not ART pause measurements. The tests do not claim constructor replay or reconstruction of arbitrary new captured values.
 
-Prioritize business logic, rendering and callbacks before signature refactors, model initialization, suspended coroutines/Flow and Repository/DI/proxy behavior. Coroutines and Flow are not covered yet. Run affected groups during development and `full` on both devices after freezing, serially on each device. Keep unchanged engine matrix evidence with its original provenance, separate from the new sample APK runs. Functional success does not resolve historical performance or long-pause failures.
+The state page retains an input draft, selected item, ViewModel, service instance, root remember token and scroll state. Keyed panels keep independent remember counters; lazy rows keep independent rememberSaveable tokens and counters plus business-object tokens. The runner checks physical placement, clicks moved items and preserves the first visible key and scroll offset through insertions, reordering and removal. State owners stay in unchanged composables; edited ordering helpers and stateless labels must not reset their unrelated state. The ordering cases edit data-producing Kotlin helpers while keeping the keyed page scope bytecode unchanged. Direct edits to a state-owning scope can still reset that scope under the upstream contract.
+
+Signature cases invoke the same Java service instance after synchronously recompiling Kotlin callers and Java callees. They check both the text and the actual returned class. Moving a helper changes its ClassFile owner; restoring the initial signatures proves continued calls without reinstalling. A rejected batch must preserve existing reachable callers and retained-object behavior. Runtime class addition is append-only and precedes the atomic redefine transaction: a newly appended type can remain after rejection. The recovery edits that type again and checks its corrected body, rather than claiming namespace rollback or class unloading.
+
+Model initialization, suspended coroutines/Flow and Repository/DI/proxy integration need further dedicated coverage. Coroutines and Flow are not covered yet. Run affected groups during development and `full` on both devices after freezing, serially on each device. Keep unchanged engine matrix evidence with its original provenance, separate from the new sample APK runs. Functional success does not resolve historical performance or long-pause failures.
 
 ## Retained lambda contract
 
@@ -49,3 +56,9 @@ For a retained closure, a capture with the same debug name and JVM type keeps it
 Missing capture debug names allow only unchanged bodies and capture layouts; evolution is refused. Retained direct compiler entries preserve their original modifiers, including private interface bodies. Ordinary method references retain their declared target contract. The current planner covers LambdaMetafactory compiler bodies, not arbitrary anonymous-class capture migration. It commits its ABI inventory only for owners actually added/redefined on the device, including reported partial success; rejected plans do not advance it.
 
 Callback mismatches fail immediately. The runner has no replacement-listener recovery step. It proves old/new behavior separately through actual calls, then verifies host refusal and native transaction refusal followed by successful retries.
+
+## State preservation boundary
+
+The rendering and refactoring groups reject a batch by making an independent, reflectively retained admission guard abstract. The guard has a real live instance, and ART must reject the transaction; changing it does not change the Compose parameter ABI. The existing `recovery` group separately covers making the live ViewModel abstract.
+
+An explored combination changed the ViewModel modifiers and a row label together. Kotlin incremental compilation changed both parameter-stability checks and intrinsic remember comparisons in its callers, changing real cache-slot layout. The existing group-reset contract then cleared local panel/row state while preserving the ViewModel, draft, selection, service and root remember state. That run remains a state-preservation failure for the stronger expectation; this change does not implement migration between different Compose slot layouts. The tests use the independent guard to isolate transaction atomicity from that layout evolution. No parameter-prologue normalization or compiler-optimization opt-out is applied.

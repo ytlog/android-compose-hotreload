@@ -92,6 +92,9 @@ internal fun executeReload(loader: ClassLoader, codeCacheDir: File, reload: Prot
                 Log.d(TAG, "Invalidating group '$key'")
                 invalidateGroupsWithKey(loader, key)
             }
+            if (reload.recomposedGroupKeys.isNotEmpty()) {
+                recomposeUnchangedGroups(loader, reload.recomposedGroupKeys)
+            }
         }
         resourceProvider?.close()
 

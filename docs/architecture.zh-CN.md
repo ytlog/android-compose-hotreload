@@ -31,7 +31,7 @@ android-compose-hotreload/
 | [host](../modules/host) | 管理设备会话、类与资源索引、重载尝试、lambda 隔离和 DEX 转换 | protocol、上游分析与 tooling 构件、D8 |
 | [gradle-plugin](../modules/gradle-plugin) | 发现 debuggable variant、插桩入口、收集编译产物、配置启动与重载 | AGP、Kotlin Gradle API、上游 Gradle 构件 |
 
-插件通过 Maven 坐标配置 host 进程与 runtime 依赖，不把 host 打包进设备。协议和 runtime 不依赖上游 JVM agent。包名、插件 ID `io.github.ytlog.compose.hot-reload.android` 和 Maven 坐标保留；资源更新使用设备协议版本 2，需配套安装新的 runtime。
+插件通过 Maven 坐标配置 host 进程与 runtime 依赖，不把 host 打包进设备。协议和 runtime 不依赖上游 JVM agent。包名、插件 ID `io.github.ytlog.compose.hot-reload.android` 和 Maven 坐标保留；资源更新使用设备协议版本 3，需配套安装新的 runtime。
 
 Gradle project 名仍为 `hot-reload-android-core`、`hot-reload-android-runtime`、`hot-reload-android-host` 和 `hot-reload-android-gradle-plugin`，由顶层 settings 映射到四个职责目录。因此 composite build 能继续按原有坐标替换项目依赖。
 
@@ -93,8 +93,14 @@ MCP、桌面示例、IDE 测试工程、Native/JS 目标和上游 CI/发布工�
 
 Android 插件通过 AGP 的公开 `SingleArtifact.APK` 获取当前 variant 的完整资源产物。`hotResources<Variant>` 提取资源表、`res/`、`assets/` 和用于校验的 Manifest，借助 AGP 提供的 aapt2 记录资源 ID 与限定配置；保留条目的压缩方式，并将未压缩条目按 4 字节对齐，保持 `noCompress` 和文件描述符读取语义。不把 DEX、签名或 native 库放进资源快照。快照纳入现有 `hotSnapshot` 输入，因此手动 `reload` 和 `--auto` 共用同一链路。当前需要构建单个 universal APK，资源构建和合并由 AGP 负责。
 
-host 的 `ResourceIndex` 以启动时安装的快照为基线，先检查 Manifest、资源名称/ID，以及已安装文件和限定配置是否被删除。不兼容修改会在提交任何类之前拒绝；内容更新与代码放在同一条设备请求中，只有设备成功响应才确认资源摘要，失败后可重试。协议版本为 2，旧 runtime 需要重新运行 `hotRun` 安装。
+host 的 `ResourceIndex` 以启动时安装的快照为基线，先检查 Manifest、资源名称/ID，以及已安装文件和限定配置是否被删除。不兼容修改会在提交任何类之前拒绝；内容更新与代码放在同一条设备请求中，只有设备成功响应才确认资源摘要，失败后可重试。协议版本为 3，旧 runtime 需要重新运行 `hotRun` 安装。
 
 runtime 在主线程先解析新资源 provider，再执行类变更，接着用公开的 [ResourcesLoader](https://developer.android.com/reference/android/content/res/loader/ResourcesLoader) / [ResourcesProvider](https://developer.android.com/reference/android/content/res/loader/ResourcesProvider) 替换共享 provider，最后重初始化静态字段并刷新 Compose。Application、已有和后续创建的 Activity 共享 loader。开发入口独立于 devtools 开关，更新时提供新的 Resources 和 Context，并清理矢量图缓存以释放旧 Theme/Resources。Android 的 Theme 按样式序列比较并去重重复样式，runtime 用每个二进制位独立的空样式标记资源版本，使 Compose painter 的主题缓存键随更新变化，不改变主题属性。普通 `remember` 状态保留，不调用 Activity recreation。类定义、已追加 DEX、资源应用后的用户静态初始化等副作用，仍不构成可完整回滚的事务。
 
 `python3 tools/resource-test.py --serial DEVICE` 验证资源内容、代码混合更新和拒绝后恢复，`--auto` 验证保存资源触发自动重载。具体使用范围见 [资源更新](android.zh-CN.md#资源更新)。
+
+## Compose 依赖刷新
+
+host 比较脏组与已应用分析中的完整作用域树。只因依赖改变而变脏、树本身未改的组单独发送；无状态作用域的常量变化在分组及调用布局相同时也只重组。布局、缓存初始化器及其求值依赖变化时沿用上游组重置。分析扩展区分缓存计算中的直接调用与缓存 lambda 对象的方法体依赖，修改回调方法体不会因此重跑其缓存初始化。依据 ClassFile 调试信息中的缓存计算区间限定依赖范围，不把缓存外的正常渲染调用算进初始化器；缺少解析／缓存区间元数据时保守重置。设备协议 3 携带两类组。
+
+runtime 通过 Compose 的注册观察器同步枚举现有 composition，立即释放临时观察器，再调用 `ControlledComposition.invalidateAll`；通过 Compose tooling 的 composition data 枚举现有 restart scope，标记一次强制重组，避免父级失效合并子级失效后因参数未变而跳过新方法体；不丢弃槽位、不复制应用状态或重跑构造器，让带 key 的子组件可移动并保留状态。应用提供的 Compose 若缺少该观察 API，则保留原组重置路径，并明确记录 remember 保留不可用。Compose 存在界面异常时，沿用其组失效恢复路径以续跑失败的 composition，普通作用域失效本身不能完成异常恢复。本次设备用例只证明样例实际解析的 Compose 版本，不代表所有旧版本。

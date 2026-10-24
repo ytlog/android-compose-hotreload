@@ -2,7 +2,7 @@
 """Continuous Kotlin -> D8 -> live Compose edits, restoring sources on exit.
 
 python3 tools/real-edit-test.py --serial DEVICE --device-id local-apiNN \
-    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|full]
+    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|full]
 Raw output stays in ignored build/evidence/. No reinstall or restart between edits.
 """
 import argparse
@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import time
 import zipfile
+from types import SimpleNamespace
+from development_scenarios import DevelopmentCases, DEVELOPMENT_SOURCES, GENERATED_SOURCES
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -39,14 +41,15 @@ def main():
     parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--art-dcevm-version', required=True)
-    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'full'], default='full')
+    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'full'], default='full')
     args = parser.parse_args()
     if not args.serial:
         parser.error('Set --serial or ANDROID_SERIAL')
     if not re.fullmatch(r'[a-z0-9-]+', args.device_id) or args.device_id == args.serial:
         parser.error('--device-id must be an anonymous lowercase label')
-    if ADDED.exists():
-        parser.error('Refusing to overwrite EditFormatter.kt')
+    for path in [ADDED, *GENERATED_SOURCES]:
+        if path.exists():
+            parser.error('Refusing to overwrite ' + path.name)
     spec = importlib.util.spec_from_file_location('device_test', ROOT / 'tools/device-test.py')
     regression = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(regression)
@@ -56,12 +59,13 @@ def main():
     evidence = ROOT / 'build/evidence' / f'real-edits-{args.device_id}-{time.time_ns()}'
     evidence.mkdir(parents=True)
     print('Evidence: ' + str(evidence.relative_to(ROOT)), flush=True)
-    originals = {path: path.read_bytes() for path in [LOGIC, SCREEN, MODEL]}
+    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, ADDED, *GENERATED_SOURCES]
+    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
     results = []
     metadata = {'device': args.device_id, 'engineVersion': args.art_dcevm_version,
                 'group': args.scenario_group, 'sourceCommit': subprocess.check_output(
                     ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-                'sources': {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in [LOGIC, SCREEN, MODEL]}}
+                'sources': {str(p.relative_to(ROOT)): sha(p.read_bytes()) for p in paths if p.exists()}}
     candidates = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD'], cwd=ROOT, text=True).splitlines()
     candidates += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], cwd=ROOT, text=True).splitlines()
     metadata['changedSources'] = {p: sha((ROOT / p).read_bytes()) for p in sorted(set(candidates)) if (ROOT / p).is_file()}
@@ -118,26 +122,27 @@ def main():
 
     def common():
         # No concurrent load on this device. Request GC, background and resume this same Activity.
-        texts = invariant()
+        texts = active_invariant()
         gc = int(value(texts, 'GC: '))
         device.tap_text('GC: ')
         device.wait_for(lambda ts: 'GC: ' + str(gc + 1) in ts, 'GC action')
         device.adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
-        device.adb('shell', 'am', 'start', '-W', '-f', '0x20000000', '-n', ACTIVITY)
-        invariant()
+        device.adb('shell', 'am', 'start', '-W', '-f', '0x20000000', '-n', current_activity)
+        active_invariant()
         with (case_dir / 'screen.png').open('wb') as image:
             subprocess.run(['adb', '-s', args.serial, 'exec-out', 'screencap', '-p'], stdout=image, check=True)
 
-    def trigger(name):
+    def new_case(name):
         nonlocal case_dir
         case_dir = evidence / name
         case_dir.mkdir()
+
+    def trigger(name):
+        new_case(name)
         diff = ''.join(''.join(difflib.unified_diff(
-            original.decode().splitlines(True), path.read_text().splitlines(True),
+            (original or b'').decode().splitlines(True), path.read_text().splitlines(True) if path.exists() else [],
             fromfile=str(path.relative_to(ROOT)), tofile=str(path.relative_to(ROOT))))
                        for path, original in originals.items())
-        if ADDED.exists():
-            diff += ADDED.read_text()
         (case_dir / 'source.patch').write_text(diff)
         offset = orchestration.stat().st_size
         host_offset = regression.HOST_LOG.stat().st_size
@@ -155,6 +160,13 @@ def main():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
             compiled[str(relative)] = sha(path.read_bytes())
+        java_classes = SAMPLE / 'build/intermediates/javac/debug/compileDebugJavaWithJavac/classes'
+        for path in java_classes.rglob('*.class'):
+            relative = path.relative_to(java_classes)
+            target = case_dir / 'java-classes' / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+            compiled['java/' + str(relative)] = sha(path.read_bytes())
         (case_dir / 'class-hashes.json').write_text(json.dumps(compiled, indent=2))
         wait(lambda: 'ReloadClassesResult' in orchestration.read_text()[offset:], 'reload response')
         host = orchestration.read_text()[offset:]
@@ -202,6 +214,15 @@ def main():
             control(fresh)
             expected['control'] = fresh
 
+    active_invariant = invariant
+    development_only = args.scenario_group in ['compose-state', 'compose-recovery', 'refactoring']
+    state_activity = APP + '/.StateEditActivity'
+    current_activity = state_activity if development_only else ACTIVITY
+    context = SimpleNamespace(device=device, evidence=evidence, source=SOURCE, snapshot=snapshot,
+                              accepted=accepted, trigger=trigger, common=common, new_case=new_case,
+                              case_dir=lambda: case_dir, results=results, app_pid=lambda: app_pid,
+                              value=value, edit=regression.edit)
+    development = None
     run_log = (evidence / 'hotRun.log').open('w')
     try:
         device.adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')
@@ -225,8 +246,11 @@ def main():
                                  stdout=probe_log, stderr=subprocess.STDOUT, text=True)
         wait(lambda: 'PROBE_READY' in orchestration.read_text(), 'orchestration observer')
         app_pid = device.adb('shell', 'pidof', APP).strip()
-        device.adb('shell', 'am', 'start', '-W', '-n', ACTIVITY)
-        device.wait_for(lambda ts: 'Real edits v1' in ts, 'real edit page', timeout=60)
+        # The runtime connects before Application/launcher onCreate completes. Wait for its first UI
+        # before launching another Activity, otherwise the pending launcher can cover the test page.
+        device.wait_for(lambda ts: 'Count: 0' in ts, 'launcher ready', timeout=60)
+        device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
+        device.wait_for(lambda ts: ('Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
         apk_dir = SAMPLE / 'build/outputs/apk/debug'
         apk_info = json.loads((apk_dir / 'output-metadata.json').read_text())
         assert len(apk_info['elements']) == 1, 'Expected a single arm64 APK'
@@ -247,20 +271,25 @@ def main():
                         abi=device.adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
                         checkJni=device.adb('shell', 'getprop', 'debug.checkjni').strip())
         (evidence / 'startup.logcat').write_text(device.logcat())
-        # Enter through the actual TextField; do not seed application state through a test API.
-        xml = device.adb('exec-out', 'uiautomator', 'dump', '/dev/tty')
-        field = re.search(r'class="android.widget.EditText"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
-        assert field, 'Missing editable input field'
-        x1, y1, x2, y2 = map(int, field.groups())
-        device.adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
-        device.adb('shell', 'input', 'text', expected['input'])
-        device.wait_for(lambda ts: 'Draft value: ' + expected['input'] in ts, 'typed input')
-        device.tap_text('Item B')
-        device.tap_text('Apply logic')
-        callback('callback-v1:draft42')
-        texts = snapshot()
-        model_id, remember_id, listener_id = (value(texts, p) for p in ['Model: ', 'Remember: ', 'Listener: '])
-        invariant()
+        if development_only:
+            development = DevelopmentCases(context)
+            active_invariant = development.invariant
+            development.start()
+        else:
+            # Enter through the actual TextField; do not seed application state through a test API.
+            xml = device.adb('exec-out', 'uiautomator', 'dump', '/dev/tty')
+            field = re.search(r'class="android.widget.EditText"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+            assert field, 'Missing editable input field'
+            x1, y1, x2, y2 = map(int, field.groups())
+            device.adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+            device.adb('shell', 'input', 'text', expected['input'])
+            device.wait_for(lambda ts: 'Draft value: ' + expected['input'] in ts, 'typed input')
+            device.tap_text('Item B')
+            device.tap_text('Apply logic')
+            callback('callback-v1:draft42')
+            texts = snapshot()
+            model_id, remember_id, listener_id = (value(texts, p) for p in ['Model: ', 'Remember: ', 'Listener: '])
+            invariant()
         group = args.scenario_group
         if group in ['business', 'full']:
             accepted('business-body', [(LOGIC, '"business-v1:${input.trim()}"', '"business-v2:${input.uppercase()}"')],
@@ -369,6 +398,29 @@ def main():
                       'fun processEdit(input: String): String = EditFormatter().format(input) + ":" + ')],
                      action=lambda: apply('new-class:draft42:recovered:' + (
                          'business-v2:24tfard' if group == 'full' else 'business-v1:draft42')))
+        if group in ['compose-state', 'compose-recovery', 'refactoring', 'full']:
+            if development is None:
+                current_activity = state_activity
+                device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
+                device.wait_for(lambda ts: 'Development edits' in ts, 'state edit page')
+                development = DevelopmentCases(context)
+                active_invariant = development.invariant
+                development.start()
+            if group in ['compose-state', 'full']:
+                development.compose()
+            if group == 'compose-recovery':
+                development.render_recovery()
+            if group in ['refactoring', 'full']:
+                development.refactoring()
+            if group == 'full':
+                new_case('return-to-original-page')
+                current_activity = ACTIVITY
+                device.adb('shell', 'am', 'start', '-W', '-f', '0x20000', '-n', ACTIVITY)
+                active_invariant = invariant
+                device.wait_for(lambda ts: 'Model: ' + model_id in ts, 'original page retained')
+                callbacks(expected['callback'], expected['control'])
+                common()
+                results.append({'name': 'return-to-original-page', 'result': 'PASS'})
     except BaseException as failure:
         results.append({'name': case_dir.name if case_dir != evidence else 'startup',
                         'result': 'FAIL', 'error': type(failure).__name__})
@@ -409,8 +461,10 @@ def main():
         finally:
             # Restore only after the host has stopped, preventing an automatic restore reload.
             for path, data in originals.items():
-                path.write_bytes(data)
-            ADDED.unlink(missing_ok=True)
+                if data is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(data)
             run_log.close()
             (evidence / 'summary.json').write_text(json.dumps(dict(metadata=metadata, results=results), indent=2))
     if any(result['result'] != 'PASS' for result in results):
