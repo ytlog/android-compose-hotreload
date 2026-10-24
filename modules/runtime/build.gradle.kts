@@ -70,7 +70,8 @@ kotlin {
 
 dependencies {
     api(project(":hot-reload-android-core"))
-    implementation(libs.artDcevm)
+    val engineVersion = providers.gradleProperty("artDcevmVersion").orElse(libs.versions.artDcevm)
+    implementation("io.github.ytlog:artdcevm:${engineVersion.get()}")
 
     /* Provided by the application (a Compose application): never override its versions */
     compileOnly(kotlin("stdlib"))

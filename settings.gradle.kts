@@ -15,6 +15,13 @@ rootProject.name = "android-compose-hotreload"
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
+        // Opt in explicitly; never let an unrelated local artifact replace a published engine.
+        if (providers.gradleProperty("artDcevmVersion").isPresent) {
+            exclusiveContent {
+                forRepository { mavenLocal() }
+                filter { includeModule("io.github.ytlog", "artdcevm") }
+            }
+        }
         exclusiveContent {
             forRepository { maven(file("upstream/compose-hot-reload/build/repo")) }
             filter { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }

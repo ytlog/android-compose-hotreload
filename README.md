@@ -8,6 +8,8 @@ This project implements the Gradle integration, host service, and device runtime
 
 [Use in an existing project](#use-in-an-existing-project) · [Build from source and run the sample](#build-from-source-and-run-the-sample) · [Android guide](docs/android.md) · [Architecture](docs/architecture.md) · [License](LICENSE.txt)
 
+Real application edit cases and Maven Local engine integration: [validation guide](docs/real-edits.md).
+
 ## Features
 
 - **Edit Compose UI and function implementations:** recompile changes and see the results in the running app.

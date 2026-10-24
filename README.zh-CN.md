@@ -8,6 +8,8 @@
 
 [接入已有工程](#接入已有工程) · [源码构建与示例](#源码构建与示例) · [Android 详细说明](docs/android.zh-CN.md) · [工程架构](docs/architecture.zh-CN.md) · [许可证](LICENSE.txt)
 
+真实页面连续编辑与 Maven Local 引擎联调见[验证指南](docs/real-edits.zh-CN.md)。
+
 ## 可以做什么
 
 - **修改 Compose UI 和函数实现**：重新编译变更，在运行中的应用里查看结果。
