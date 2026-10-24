@@ -161,7 +161,7 @@ python3 tools/device-test.py --serial DEVICE --only "live class abstract rejecti
 
 The engine shared library in the Maven Central alpha.3 AAR has been checked against the one packaged in the APK. The AAR SHA-256 is `ed1de8df09aa0bc5f6af00b389acf3b6dfcb77cb8bb579deb35555f5600b6554`.
 
-Each script run saves a source patch, capabilities, device and host logs, and a summary under `sample/build/device-test-evidence/<run>/`. Source regressions cover common workflows in this project, not every possible combination of engine structural changes.
+Each `device-test.py` run saves a source patch, capabilities, device and host logs, and a summary under `build/evidence/device-<anonymous-device>-<run>/`. Source regressions cover common workflows in this project, not every possible combination of engine structural changes.
 
 Development workflows are checked separately:
 

@@ -2,6 +2,7 @@ package org.jetbrains.compose.reload.android.host.session
 
 import org.jetbrains.compose.reload.android.host.upstream.UpstreamAnalysis
 
+import org.jetbrains.compose.reload.android.host.dex.LambdaClassState
 import javassist.ClassPool
 import org.jetbrains.compose.reload.analysis.ClassId
 import org.jetbrains.compose.reload.analysis.ClassInfo
@@ -34,17 +35,20 @@ internal class ApplicationIndex(
     Bytecode of every class of the installed application (including ignored ones), as currently run by the device.
     A snapshot: build outputs change before they are reloaded.
      */
-    private val bytecode = HashMap<ClassId, ByteArray>()
+    private data class Definition(val original: ByteArray, val lambdas: LambdaClassState? = null)
+    private val definitions = HashMap<ClassId, Definition>()
 
     init {
         val duration = measureTime { index(classpath) }
-        logger.info("Indexed ${bytecode.size} classes (${currentApplicationInfo.classIndex.size} tracked) in $duration")
+        logger.info("Indexed ${definitions.size} classes (${currentApplicationInfo.classIndex.size} tracked) in $duration")
     }
 
     /** Equivalent to upstream: the class can be found by the application ('findClassLoader(classId) != null') */
-    fun isKnown(classId: ClassId): Boolean = classId in bytecode
+    fun isKnown(classId: ClassId): Boolean = classId in definitions
 
-    fun bytecode(classId: ClassId): ByteArray? = bytecode[classId]
+    fun bytecode(classId: ClassId): ByteArray? = definitions[classId]?.original
+
+    fun lambdaState(classId: ClassId): LambdaClassState? = definitions[classId]?.lambdas
 
     /**
      * Upstream uses a pool backed by the application class loader ('getClassPool(loader)').
@@ -55,13 +59,13 @@ internal class ApplicationIndex(
     }
 
     /** A class was redefined on the device: [bytecode] before transformations */
-    fun redefined(classId: ClassId, bytecode: ByteArray) {
-        this.bytecode[classId] = bytecode
+    fun redefined(classId: ClassId, bytecode: ByteArray, lambdas: LambdaClassState? = lambdaState(classId)) {
+        definitions[classId] = Definition(bytecode, lambdas)
     }
 
     /** A new class was added to the application: Upstream tracks it once loaded ('classBeingRedefined == null') */
-    fun added(classId: ClassId, bytecode: ByteArray) {
-        this.bytecode[classId] = bytecode
+    fun added(classId: ClassId, bytecode: ByteArray, lambdas: LambdaClassState? = null) {
+        definitions[classId] = Definition(bytecode, lambdas)
         track(classId, bytecode)?.let { currentApplicationInfo.add(it) }
     }
 
@@ -98,7 +102,7 @@ internal class ApplicationIndex(
             }.forEach { future ->
                 val (classId, code, info) = future.get() ?: return@forEach
                 /* First classpath entry wins */
-                if (bytecode.putIfAbsent(classId, code) != null) return@forEach
+                if (definitions.putIfAbsent(classId, Definition(code)) != null) return@forEach
                 if (info != null) currentApplicationInfo.add(info)
             }
         } finally {

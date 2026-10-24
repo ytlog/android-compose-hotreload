@@ -9,6 +9,9 @@ Sources are restored on exit.
 """
 import argparse
 import difflib
+import hashlib
+import shutil
+import zipfile
 import json
 import os
 import re
@@ -26,7 +29,6 @@ LABELS = SAMPLE / "src/main/java/dev/compose/hotreload/sample/Labels.kt"
 LIBRARY = SAMPLE / "lib/src/main/java/dev/compose/hotreload/sample/lib/LibraryCard.kt"
 ADDED = SAMPLE / "src/main/java/dev/compose/hotreload/sample/Added.kt"
 HOST_LOG = SAMPLE / "build/run/debug/debug.chr.log"
-RUN_LOG = SAMPLE / "build/device-test-hotRun.log"
 PID_FILE = HOST_LOG.with_name("debug.pid")
 LOADED_LABELS_CALL = ('LoadedLabels().also { '
                       'System.getProperties()["compose.hotreload.loadedLabels"] = it }.required() + ')
@@ -222,7 +224,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial", default=os.environ.get("ANDROID_SERIAL"))
     parser.add_argument("--only", nargs="*")
+    parser.add_argument("--device-id", default="local-device")
     args = parser.parse_args()
+    if not re.fullmatch(r"[a-z0-9-]+", args.device_id) or args.device_id == args.serial:
+        parser.error("--device-id must be an anonymous lowercase label")
     unknown = set(args.only or ()) - {case["name"] for case in SCENARIOS}
     if unknown:
         parser.error(f"Unknown scenarios: {sorted(unknown)}")
@@ -245,14 +250,13 @@ def main():
         env["ANDROID_SERIAL"] = args.serial
     device = Device(args.serial)
     originals = {path: path.read_text() for path in (MAIN, JAVA, LABELS, LIBRARY)}
-    evidence = SAMPLE / "build/device-test-evidence" / str(time.time_ns())
+    evidence = SAMPLE.parent / "build/evidence" / f"device-{args.device_id}-{time.time_ns()}"
     evidence.mkdir(parents=True)
-    print(f"Evidence: {evidence}", flush=True)
+    print(f"Evidence: {evidence.relative_to(SAMPLE.parent)}", flush=True)
 
     print("Starting hotRunDebug ...", flush=True)
     HOST_LOG.unlink(missing_ok=True)
-    RUN_LOG.parent.mkdir(parents=True, exist_ok=True)
-    run_log = RUN_LOG.open("w")
+    run_log = (evidence / "hotRun.log").open("w")
     run = subprocess.Popen([str(SAMPLE / "gradlew"), "-p", str(SAMPLE), "--console=plain", "hotRunDebug"],
                            env=env, stdout=run_log, stderr=subprocess.STDOUT, start_new_session=True)
     results = []
@@ -260,7 +264,7 @@ def main():
     try:
         deadline = time.time() + 600
         while not (HOST_LOG.exists() and "Connected to" in HOST_LOG.read_text()):
-            assert run.poll() is None, f"hotRunDebug exited, see {RUN_LOG}"
+            assert run.poll() is None, "hotRunDebug exited, see ignored hotRun.log"
             assert time.time() < deadline, "Timed out waiting for the application"
             time.sleep(2)
         device.wait_for(lambda texts: any(t.startswith("Count: ") for t in texts), "the application UI")
@@ -269,9 +273,24 @@ def main():
         (evidence / "startup.logcat").write_text(initial_log)
         initial_capabilities = capabilities(initial_log, "ART DCEVM capabilities: ")
         print("ART DCEVM capabilities: " + json.dumps(initial_capabilities), flush=True)
-        metadata = dict(serial=args.serial, abi=device.adb("shell", "getprop", "ro.product.cpu.abi").strip(),
+        metadata = dict(device=args.device_id, abi=device.adb("shell", "getprop", "ro.product.cpu.abi").strip(),
                         api=int(device.adb("shell", "getprop", "ro.build.version.sdk").strip()),
                         capabilities=initial_capabilities)
+        apk_dir = SAMPLE / "build/outputs/apk/debug"
+        apk_info = json.loads((apk_dir / "output-metadata.json").read_text())
+        assert len(apk_info["elements"]) == 1, "Expected one APK"
+        apk = apk_dir / apk_info["elements"][0]["outputFile"]
+        digest = lambda data: hashlib.sha256(data).hexdigest()
+        installed = device.adb("shell", "pm", "path", APP).strip().removeprefix("package:")
+        assert device.adb("shell", "sha256sum", installed).split()[0] == digest(apk.read_bytes()), "Installed APK differs"
+        shutil.copyfile(apk, evidence / "installed-base.apk")
+        with zipfile.ZipFile(apk) as archive:
+            engine = digest(archive.read("lib/arm64-v8a/libartdcevm.so"))
+        metadata.update(apkSha256=digest(apk.read_bytes()), engineSha256=engine,
+                        model=device.adb("shell", "getprop", "ro.product.model").strip(),
+                        checkJni=device.adb("shell", "getprop", "debug.checkjni").strip(),
+                        sourceCommit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=SAMPLE.parent, text=True).strip(),
+                        scenarios=[case["name"] for case in SCENARIOS if case["name"] in selected])
         (evidence / "device.json").write_text(json.dumps(metadata, indent=2))
         assert metadata["abi"] == "arm64-v8a" and metadata["api"] >= 30, metadata
         device.adb("shell", "run-as", APP, "true")  # verifies the installed app is debuggable

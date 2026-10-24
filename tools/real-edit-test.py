@@ -71,7 +71,8 @@ def main():
     probe = None
     probe_log = None
     orchestration = evidence / 'orchestration.log'
-    expected = {'input': 'draft42', 'page': 'Item B', 'operations': 1, 'callbackCalls': 0}
+    expected = {'input': 'draft42', 'page': 'Item B', 'operations': 1, 'callbackCalls': 0,
+                'registrations': 1, 'controlCalls': 0, 'callback': 'callback-v1:draft42', 'control': None}
     case_dir = evidence
 
     def wait(condition, description, timeout=180):
@@ -111,6 +112,8 @@ def main():
         assert 'Page: ' + expected['page'] in texts, 'Detail selection lost'
         assert 'Operations: ' + str(expected['operations']) in texts, 'Business object state lost'
         assert 'Callback calls: ' + str(expected['callbackCalls']) in texts, 'Callback duplicated or lost'
+        assert 'Registrations: ' + str(expected['registrations']) in texts, 'Registration factory replayed'
+        assert 'Control calls: ' + str(expected['controlCalls']) in texts, 'Control duplicated or lost'
         return texts
 
     def common():
@@ -160,29 +163,18 @@ def main():
         elapsed = time.monotonic() - start
         return host, elapsed
 
-    def accepted(name, edits, action=None, visible=(), probe_callback=False):
+    def accepted(name, edits, action=None, visible=()):
         for path, old, new in edits:
             regression.edit(path, old, new)
         host, elapsed = trigger(name)
         assert 'ReloadClassesResult success=true' in host, 'Reload rejected; inspect host.log'
         if visible:
             device.wait_for(lambda ts: all(v in ts for v in visible), name, timeout=60)
-        failure = None
         if action:
-            try:
-                action()
-            except AssertionError as error:
-                if not probe_callback:
-                    raise
-                failure = str(error)
-                (case_dir / 'callback-failure.txt').write_text(failure)
+            action()
         common()
-        result = {'name': name, 'result': 'FAIL' if failure else 'PASS', 'reloadSeconds': round(elapsed, 3),
-                  'reloadAccepted': True}
-        if failure:
-            result['error'] = failure
-        results.append(result)
-        print(result['result'] + ': ' + name, flush=True)
+        results.append({'name': name, 'result': 'PASS', 'reloadSeconds': round(elapsed, 3), 'reloadAccepted': True})
+        print('PASS: ' + name, flush=True)
 
     def apply(expected_result):
         expected['operations'] += 1
@@ -196,18 +188,19 @@ def main():
         actual = value(texts, 'Callback: ')
         assert actual == expected_result, f'Expected {expected_result}; observed {actual}'
 
-    def register_again(name, expected_result):
-        nonlocal case_dir, listener_id
-        case_dir = evidence / name
-        case_dir.mkdir()
-        previous = listener_id
-        device.tap_text('Register again')
-        texts = device.wait_for(lambda ts: value(ts, 'Listener: ') != previous, 'explicit listener registration')
-        listener_id = value(texts, 'Listener: ')
-        callback(expected_result)
-        common()
-        results.append({'name': name, 'result': 'PASS', 'explicitRegistration': True})
-        print('PASS: ' + name, flush=True)
+    def control(expected_result):
+        expected['controlCalls'] += 1
+        device.tap_text('Call control')
+        texts = device.wait_for(lambda ts: 'Control calls: ' + str(expected['controlCalls']) in ts, 'control completion')
+        actual = value(texts, 'Control: ')
+        assert actual == expected_result, f'Expected control {expected_result}; observed {actual}'
+
+    def callbacks(old, fresh=None):
+        callback(old)
+        expected['callback'] = old
+        if fresh is not None:
+            control(fresh)
+            expected['control'] = fresh
 
     run_log = (evidence / 'hotRun.log').open('w')
     try:
@@ -245,6 +238,7 @@ def main():
             aar_engine = archive.read('jni/arm64-v8a/libartdcevm.so')
         assert sha(apk_engine) == sha(aar_engine), 'APK did not package the Maven Local engine'
         installed = device.adb('shell', 'pm', 'path', APP).strip().removeprefix('package:')
+        shutil.copyfile(apk, evidence / 'installed-base.apk')
         installed_hash = device.adb('shell', 'sha256sum', installed).split()[0]
         assert installed_hash == sha(apk.read_bytes()), 'Installed APK hash differs'
         metadata.update(apkSha256=installed_hash, aarSha256=sha(aar.read_bytes()), engineSha256=sha(aar_engine),
@@ -290,16 +284,61 @@ def main():
             assert 'Added action' not in snapshot(), 'Deleted component still visible'
         if group in ['callbacks', 'full']:
             accepted('registered-callback-body', [(LOGIC, 'callback-v1:', 'callback-v2:')],
-                     action=lambda: callback('callback-v2:draft42'), probe_callback=True)
-            accepted('insert-lambda-before-listener', [(LOGIC, '// INSERT_CALLBACK',
-                                                       'val unrelated: () -> String = { "wrong-listener" }; check(unrelated().isNotEmpty())')],
-                     action=lambda: callback('callback-v2:draft42'), probe_callback=True)
-            register_again('register-after-insertion', 'callback-v2:draft42')
-            # Capturing a newly calculated local is a deliberate strict test of an already registered closure.
-            accepted('add-captured-local', [(LOGIC, 'return { "callback-v2:${model.input}" }',
-                                            'val prefix = "captured:${model.input}"; return { "$prefix:${model.input}" }')],
-                     action=lambda: callback('captured:draft42:draft42'), probe_callback=True)
-            register_again('register-after-capture', 'captured:draft42:draft42')
+                     action=lambda: callbacks('callback-v2:draft42'))
+            inserted = 'val unrelated: () -> String = { "wrong-listener" }; check(unrelated().isNotEmpty())'
+            accepted('insert-lambda-before-listener', [(LOGIC, '// INSERT_CALLBACK', inserted)],
+                     action=lambda: callbacks('callback-v2:draft42'))
+            same_capture = 'val decoy: () -> String = { "wrong-captured:${model.input}" }; check(decoy().isNotEmpty())'
+            accepted('insert-same-capture-lambda', [(LOGIC, inserted, inserted + '\n    ' + same_capture)],
+                     action=lambda: callbacks('callback-v2:draft42'))
+            accepted('body-after-insertion', [(LOGIC, 'callback-v2:', 'callback-v3:')],
+                     action=lambda: callbacks('callback-v3:draft42'))
+            # Never reconstruct new capture initializers for an existing closure: null/0 are the contract.
+            plain_body = 'return { "callback-v3:${model.input}" }'
+            reference_body = 'val prefix = "captured:${model.input}"; return { "$prefix:${model.input}" }'
+            captured_body = 'val prefix = "captured:${model.input}"; val bonus = model.input.length + 0; return { "$prefix:$bonus:${model.input}" }'
+            accepted('add-captured-local', [(LOGIC, plain_body, reference_body)],
+                     action=lambda: callbacks('null:draft42'))
+            accepted('add-primitive-capture', [(LOGIC, reference_body, captured_body)],
+                     action=lambda: callbacks('null:0:draft42'))
+            # This second closure is a control, not a replacement for the original immutable listener.
+            case_dir = evidence / 'parallel-control'
+            case_dir.mkdir()
+            device.tap_text('Make control')
+            expected['registrations'] = 2
+            device.wait_for(lambda ts: 'Registrations: 2' in ts, 'parallel control registration')
+            callbacks('null:0:draft42', 'captured:draft42:7:draft42')
+            common()
+            results.append({'name': 'parallel-control', 'result': 'PASS', 'originalListenerUnchanged': True})
+            reordered_body = captured_body.replace('$prefix:$bonus:', '$bonus:$prefix:')
+            accepted('reorder-captures', [(LOGIC, captured_body, reordered_body)],
+                     action=lambda: callbacks('0:null:draft42', '7:captured:draft42:draft42'))
+            removed_body = 'return { "callback-v4:${model.input}" }'
+            accepted('remove-captures', [(LOGIC, reordered_body, removed_body)],
+                     action=lambda: callbacks('callback-v4:draft42', 'callback-v4:draft42'))
+            accepted('restore-captures', [(LOGIC, removed_body, reordered_body)],
+                     action=lambda: callbacks('0:null:draft42', '7:captured:draft42:draft42'))
+            # An inserted old capture schema plus an evolved original body cannot prove identity.
+            ambiguous = 'val ambiguous: () -> String = { "ambiguous:$bonus:$prefix:${model.input}" }; check(ambiguous().isNotEmpty()); '
+            evolved = 'val enabled = model.input.isNotEmpty(); '
+            before_logcat = device.logcat()
+            regression.edit(LOGIC, 'return { "$bonus:$prefix:', evolved + ambiguous + 'return { "pending:$enabled:$bonus:$prefix:')
+            host, elapsed = trigger('ambiguous-lambda-rejection')
+            assert 'success=false' in host and 'Ambiguous lambda identity' in host, 'Missing host identity rejection'
+            after_logcat = device.logcat()
+            (case_dir / 'before-rejection.logcat').write_text(before_logcat)
+            (case_dir / 'after-rejection.logcat').write_text(after_logcat)
+            request_ids = lambda log: set(re.findall(r'RedefineClasses request ([^:]+):', log))
+            assert request_ids(before_logcat), 'Missing positive control for device request logging'
+            assert not (request_ids(after_logcat) - request_ids(before_logcat)), 'Ambiguous plan reached device redefinition'
+            assert 'matchLambdas' in (case_dir / 'host.log').read_text(), 'Missing planner rejection stack'
+            callbacks(expected['callback'], expected['control'])
+            common()
+            results.append({'name': 'ambiguous-lambda-rejection', 'result': 'PASS', 'reloadSeconds': round(elapsed, 3),
+                            'hostRejection': True})
+            accepted('recover-lambda-mapping', [(LOGIC, evolved + ambiguous, ''), (LOGIC, 'pending:$enabled:', 'callback-recovered:')],
+                     action=lambda: callbacks('callback-recovered:0:null:draft42',
+                                              'callback-recovered:7:captured:draft42:draft42'))
         if group in ['recovery', 'full']:
             # The actual live ViewModel becomes abstract: expect engine rejection, unchanged old behavior,
             # and the pending companion edit to take effect only after the invalid edit is removed.
@@ -307,15 +346,23 @@ def main():
             regression.edit(MODEL, 'class RealEditModel : ViewModel()', 'abstract class RealEditModel : ViewModel()')
             regression.edit(LOGIC, 'fun processEdit(input: String): String = ',
                             'fun processEdit(input: String): String = "recovered:" + ')
+            callback_before, control_before = expected['callback'], expected['control']
+            callback_marker = 'callback-recovered:' if group == 'full' else 'callback-v1:'
+            regression.edit(LOGIC, 'return { "' + callback_marker,
+                            'val allow = model.input.startsWith("draft"); return { "callback-committed:$allow:')
             host, elapsed = trigger('atomic-live-model-rejection')
             assert 'success=false' in host and 'class made abstract has live instances' in host, 'Missing native rejection'
             assert business_before in invariant(), 'Rejected batch changed result'
             apply(business_before.removeprefix('Result: '))
+            callbacks(callback_before, control_before)
             common()
             results.append({'name': 'atomic-live-model-rejection', 'result': 'PASS', 'reloadSeconds': round(elapsed, 3)})
             MODEL.write_bytes(originals[MODEL])
-            accepted('recover-pending-edit', [], action=lambda: apply(
-                'recovered:' + ('business-v2:24tfard' if group == 'full' else 'business-v1:draft42')))
+            def recovered():
+                apply('recovered:' + ('business-v2:24tfard' if group == 'full' else 'business-v1:draft42'))
+                callbacks(callback_before.replace(callback_marker, 'callback-committed:false:'),
+                          control_before.replace(callback_marker, 'callback-committed:false:') if control_before else None)
+            accepted('recover-pending-edit', [], action=recovered)
             accepted('new-class-and-caller', [(ADDED, None,
                      'package dev.compose.hotreload.sample\nclass EditFormatter { fun format(input: String) = "new-class:$input" }\n'),
                      (LOGIC, 'fun processEdit(input: String): String = ',

@@ -4,6 +4,7 @@ fun processEdit(input: String): String = if (input.isBlank()) "empty-v1" else "b
 
 /** Registered once by the ViewModel, so a render cannot silently replace the listener under test. */
 fun registerEditCallback(model: RealEditModel): () -> String {
+    model.recordRegistration()
     // INSERT_CALLBACK
     return { "callback-v1:${model.input}" }
 }

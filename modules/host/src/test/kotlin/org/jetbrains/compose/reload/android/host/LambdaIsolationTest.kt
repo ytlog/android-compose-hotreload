@@ -1,7 +1,8 @@
 package org.jetbrains.compose.reload.android.host
 
 import org.jetbrains.compose.reload.android.host.dex.Dexer
-import org.jetbrains.compose.reload.android.host.dex.isolateLambdas
+import org.jetbrains.compose.reload.android.host.dex.prepareLambdas
+import org.jetbrains.compose.reload.android.host.dex.LambdaAccessor
 import org.jetbrains.compose.reload.android.host.dex.readLambdaAccessors
 
 import org.jetbrains.compose.reload.analysis.ClassId
@@ -45,6 +46,9 @@ class LambdaIsolationTest {
     private val classId = ClassId(LambdaFixture::class.java.name.replace('.', '/'))
     private val bytecode = LambdaFixture::class.java.getResourceAsStream("LambdaFixture.class")!!.readBytes()
     private val dexer by lazy { Dexer(30, listOf(androidJar), emptyList()) }
+
+    private fun isolateLambdas(id: ClassId, code: ByteArray, generation: Int, accessors: List<LambdaAccessor>) =
+        prepareLambdas(id, code, code, generation, null, code, accessors).classes
 
     @Test
     fun `accessors of the original class are kept`() {

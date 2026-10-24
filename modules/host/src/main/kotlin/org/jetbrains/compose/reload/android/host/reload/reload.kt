@@ -5,7 +5,9 @@ import org.jetbrains.compose.reload.android.host.session.ResourceIndex
 import org.jetbrains.compose.reload.android.host.upstream.UpstreamAgent
 import org.jetbrains.compose.reload.android.host.device.Device
 import org.jetbrains.compose.reload.android.host.dex.Dexer
-import org.jetbrains.compose.reload.android.host.dex.isolateLambdas
+import org.jetbrains.compose.reload.android.host.dex.prepareLambdas
+import org.jetbrains.compose.reload.android.host.dex.lambdaSites
+import org.jetbrains.compose.reload.android.host.dex.readClass
 import org.jetbrains.compose.reload.android.host.dex.readLambdaAccessors
 
 import javassist.ClassPool
@@ -128,17 +130,22 @@ internal fun Context.reload(
     val statics = resolveStaticsReinitialization(index, classPool, definitions, dirty)
     val allDefinitions = definitions + statics.additionalDefinitions
 
-    /*
-    Analysis is done: lambda call sites are moved for DEX conversion only (see 'isolateLambdas').
-    A first D8 pass provides the '$r8$lambda$' accessors D8 creates for the original call sites.
-     */
+    // Seed from the installed snapshot once. Current-pass accessors cannot describe cached old closures.
     val generation = reloadGeneration.incrementAndGet()
-    val originalDex = dexer.dex(allDefinitions.associate { it.classId to it.bytecode })
-    val dex = dexer.dex(allDefinitions.fold(LinkedHashMap<ClassId, ByteArray>()) { classes, definition ->
-        val accessors = originalDex[definition.classId.toFqn()]
+    val seeds = allDefinitions.mapNotNull { definition ->
+        index.bytecode(definition.classId)?.takeIf {
+            index.lambdaState(definition.classId) == null && readClass(it).lambdaSites().isNotEmpty()
+        }?.let { definition.classId to it }
+    }.toMap()
+    val installedDex = dexer.dex(seeds)
+    val plans = allDefinitions.associate { definition ->
+        val initial = seeds[definition.classId]
+        val accessors = installedDex[definition.classId.toFqn()]
             ?.let { readLambdaAccessors(it, definition.classId.value) }.orEmpty()
-        classes.apply { putAll(isolateLambdas(definition.classId, definition.bytecode, generation, accessors)) }
-    })
+        definition.classId to prepareLambdas(definition.classId, definition.original, definition.bytecode,
+            generation, index.lambdaState(definition.classId), initial, accessors)
+    }
+    val dex = dexer.dex(plans.values.flatMap { it.classes.entries }.associate { it.key to it.value })
     val staticsOnly = statics.additionalDefinitions.mapTo(HashSet()) { it.classId.toFqn() }
 
     val groups = dirty.dirtyScopes.mapNotNull { it.group?.key }.distinct().toIntArray()
@@ -159,16 +166,21 @@ internal fun Context.reload(
     )
 
     if (result.classesAdded || result.success) {
-        definitions.filter { it.isNew }.forEach { index.added(it.classId, it.original) }
+        definitions.filter { it.isNew }.forEach { index.added(it.classId, it.original, plans.getValue(it.classId).state) }
     }
 
     if (result.classesRedefined || result.success) {
         attempt.commit()
         definitions.filter { !it.isNew }.forEach { definition ->
-            index.redefined(definition.classId, definition.original)
+            index.redefined(definition.classId, definition.original, plans.getValue(definition.classId).state)
         }
         /* upstream: statics-only redefinitions are recorded as pending redefinitions for the next reload */
-        statics.additionalDefinitions.forEach { index.enqueueRedefinition(it.classId, it.bytecode) }
+        statics.additionalDefinitions.forEach {
+            // The device may skip a statics-only owner (unloaded/already transformed).
+            // Its source has not evolved: entries/IDs are deterministic from the same original snapshot.
+            // Keep the prior inventory (or seed it again), never claim a skipped owner was installed.
+            index.enqueueRedefinition(it.classId, it.bytecode)
+        }
     }
 
     if (!result.success) {

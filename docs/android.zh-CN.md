@@ -161,7 +161,7 @@ python3 tools/device-test.py --serial DEVICE --only "live class abstract rejecti
 
 已核对 Maven Central alpha.3 AAR 的引擎动态库与 APK 内打包内容一致，AAR SHA-256 为 `ed1de8df09aa0bc5f6af00b389acf3b6dfcb77cb8bb579deb35555f5600b6554`。
 
-每次脚本执行在 `sample/build/device-test-evidence/<run>/` 保存 source patch、capabilities、设备与主机日志和汇总。源码回归覆盖本项目的常用流程，不代表引擎的所有结构演进组合都已逐项运行。
+`device-test.py` 每次执行在 `build/evidence/device-<anonymous-device>-<run>/` 保存 source patch、capabilities、设备与主机日志和汇总。源码回归覆盖本项目的常用流程，不代表引擎的所有结构演进组合都已逐项运行。
 
 开发工作流另行验证：
 

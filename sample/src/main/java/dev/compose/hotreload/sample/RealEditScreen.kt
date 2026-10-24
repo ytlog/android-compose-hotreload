@@ -33,10 +33,14 @@ fun RealEditScreen(model: RealEditModel) {
         Text("Operations: ${model.operations}")
         Row {
             Button(onClick = { model.invokeRegistered() }) { Text("Call listener") }
-            Button(onClick = { model.registerAgain() }) { Text("Register again") }
+            Button(onClick = { model.makeControl() }) { Text("Make control") }
         }
         Text("Callback: ${model.callbackResult}")
         Text("Callback calls: ${model.callbackCalls}")
+        Text("Registrations: ${model.registrations}")
+        Button(onClick = { model.invokeControl() }) { Text("Call control") }
+        Text("Control: ${model.controlResult}")
+        Text("Control calls: ${model.controlCalls}")
         Button(onClick = { model.collectGarbage() }) { Text("GC: ${model.collections}") }
         // INSERT_COMPONENT
     }
