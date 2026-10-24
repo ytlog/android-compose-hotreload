@@ -15,6 +15,7 @@ internal data class LambdaEntry(
     val captures: List<Capture>,
     val ordinaryTarget: Handle? = null,
     val instance: Boolean = false,
+    val access: Int? = null,
 ) {
     val methodDescriptor: String get() = if (!instance) descriptor else Type.getMethodDescriptor(
         Type.getReturnType(descriptor), *Type.getArgumentTypes(descriptor).drop(1).toTypedArray())
@@ -135,7 +136,7 @@ private fun seedLambdas(classId: ClassId, code: ByteArray, accessors: List<Lambd
     // Retain their original invocation ABI too, including an implicit receiver for instance bodies.
     val direct = matches.map { (site, _, id) ->
         LambdaEntry(site.target.name, site.type.descriptor, id, site.captures,
-            instance = site.target.tag != Opcodes.H_INVOKESTATIC)
+            instance = site.target.tag != Opcodes.H_INVOKESTATIC, access = site.method.access)
     }
     val byId = baseline.versions.associateBy { it.id }
     check(matches.all { (_, _, id) -> id in byId })
@@ -171,8 +172,9 @@ private fun rewriteImplementations(methods: List<MethodNode>, replacements: Map<
 private fun entryMethod(
     owner: String, isInterface: Boolean, entry: LambdaEntry, versions: Map<Int, LambdaVersion>,
 ): MethodNode {
-    val method = MethodNode(Opcodes.ACC_PUBLIC or Opcodes.ACC_SYNTHETIC or
-        (if (entry.instance) 0 else Opcodes.ACC_STATIC), entry.name, entry.methodDescriptor, null, null)
+    val access = entry.access ?: (Opcodes.ACC_PUBLIC or Opcodes.ACC_SYNTHETIC or
+        (if (entry.instance) 0 else Opcodes.ACC_STATIC))
+    val method = MethodNode(access, entry.name, entry.methodDescriptor, null, null)
     val originalTypes = Type.getArgumentTypes(entry.descriptor)
     val slots = originalTypes.mapIndexed { index, _ -> originalTypes.take(index).sumOf { it.size } }
     fun load(index: Int) { method.instructions.add(VarInsnNode(originalTypes[index].getOpcode(Opcodes.ILOAD), slots[index])) }

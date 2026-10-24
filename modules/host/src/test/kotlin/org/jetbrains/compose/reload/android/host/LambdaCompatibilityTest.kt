@@ -104,7 +104,8 @@ class LambdaCompatibilityTest {
             Type.BOOLEAN -> Boolean::class.javaPrimitiveType!!
             else -> Class.forName(type.className)
         } }.toTypedArray()
-        return owner(plan).getMethod(entry.name, *types).invoke(null, *arguments) as String
+        return owner(plan).getDeclaredMethod(entry.name, *types).apply { isAccessible = true }
+            .invoke(null, *arguments) as String
     }
 
     @Test

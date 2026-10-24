@@ -105,6 +105,22 @@ class LambdaIsolationTest {
     }
 
     @Test
+    fun `installed compiler entry modifiers are preserved on classes and interfaces`() {
+        for (fixture in listOf(LambdaFixture::class.java, InterfaceLambdaFixture::class.java)) {
+            val id = ClassId(fixture.name.replace('.', '/'))
+            val code = fixture.getResourceAsStream("${fixture.simpleName}.class")!!.readBytes()
+            val original = ClassNode().also { ClassReader(code).accept(it, 0) }
+            val accessors = readLambdaAccessors(dexer.dex(mapOf(id to code)).getValue(id.toFqn()), id.value)
+            val rewritten = isolateLambdas(id, code, 11, accessors)
+            val node = ClassNode().also { ClassReader(rewritten.getValue(id)).accept(it, 0) }
+            original.methods.filter { it.name.contains("\$lambda\$") }.forEach { before ->
+                val retained = node.methods.single { it.name == before.name && it.desc == before.desc }
+                assertEquals(before.access, retained.access, "Retained compiler entry modifiers: ${fixture.simpleName}.${before.name}")
+            }
+        }
+    }
+
+    @Test
     fun `classes without lambdas are unchanged`() {
         val plain = ClassId("org/jetbrains/compose/reload/android/host/HostConfig")
         val plainBytecode = HostConfig::class.java.getResourceAsStream("HostConfig.class")!!.readBytes()
