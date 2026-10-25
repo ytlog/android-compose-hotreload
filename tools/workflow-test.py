@@ -5,6 +5,7 @@ Usage: python3 tools/workflow-test.py --serial DEVICE
 Sample source is restored on exit. No manual reload command is invoked.
 """
 import argparse
+from ui_driver import UiDriver
 import importlib.util
 import json
 import os
@@ -39,6 +40,7 @@ def main():
     original = regression.MAIN.read_text()
     environment = dict(os.environ, ANDROID_SERIAL=args.serial)
     results = []
+    ui_driver = UiDriver(device, evidence)
     host_pid = None
     probe = None
     probe_log = None
@@ -68,6 +70,7 @@ def main():
         probe.stdin.flush()
 
     try:
+        ui_driver.start()
         wait(lambda: regression.HOST_LOG.exists() and 'Connected to' in regression.HOST_LOG.read_text(),
              'host connection', timeout=600)
         properties = dict(line.split('=', 1) for line in regression.PID_FILE.read_text().splitlines() if '=' in line)
@@ -116,6 +119,17 @@ def main():
         device.wait_for(lambda texts: 'Count: 0' in texts, 'RetryFailedCompositionRequest', timeout=60)
         passed('retry composition request', 'Upstream request rebuilds the recovered composition')
 
+        # A burst may coalesce intermediate revisions, but the last save must win without resetting state.
+        before = device.count()
+        for revision in range(10):
+            regression.MAIN.write_text(original.replace('"Hello Android Hot Reload"', f'"Rapid revision {revision}"'))
+            time.sleep(0.05)
+        device.wait_for(lambda texts: 'Rapid revision 9' in texts, 'latest rapid save', timeout=180)
+        assert device.count() == before, 'Rapid saves reset unrelated state'
+        time.sleep(2)
+        assert 'Rapid revision 9' in device.texts(), 'An older compilation overtook the final save'
+        passed('rapid saves final revision', 'Ten source saves converge on the latest revision with retained state')
+
         os.kill(host_pid, signal.SIGTERM)
         host_pid = None
         deadline = time.time() + 30
@@ -127,6 +141,7 @@ def main():
         results.append(dict(name='workflow', result='FAIL', note=str(failure)))
         raise
     finally:
+        ui_driver.close()
         if host_pid is not None:
             try:
                 os.kill(host_pid, signal.SIGTERM)

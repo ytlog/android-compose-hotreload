@@ -155,3 +155,6 @@ Kotlin 按源码顺序给编译器生成的方法编号。插入 lambda 会改�
 代理处理器将已有代理入口的 Method 真实调用到具体 Repository，包括初始 default 方法；不会伪造返回值。新增 abstract／default 沿用现有 JVM 代理重链接契约，不自动生成新 handler 转发入口；这分别是安全失败和绕过 handler 的默认调用，不能统计为新增代理方法转发成功。旧代理、新代理、缓存的 read Method 均真实调用，签名变化后单独验收退休 Method 的安全失败。Object 的 equals／hashCode／toString 仍采用身份语义。没有给旧容器自动重新绑定或重新注入；本组覆盖 Koin single、factory 与构造注入，不推广为所有 DI／网络代理框架或自动 default 调用机制的兼容承诺。
 
 独立台账精确检查 Repository 构造、客户端构造、业务 read 和 handler 次数，重载、GC、前后台切换不得额外执行这些动作。每次调用比较旧新数据、ViewModel 与 remember 标识、代理类缓存及所有引用锚点。同一进程依次运行 13 个场景，拒绝后直接检查旧新对象，再修正并重试。开发期运行 `--scenario-group repositories`；`repositories-interface` 单独定位新增抽象方法的真实调用与代理边界；冻结后纳入 `full`，设备结论单独记录。
+
+
+Compose Effect、状态作用域、页面重建、真实 HTTP／框架缓存、跨模块编译及连续更新的补充契约见 [集成场景](integration-edits.zh-CN.md)。

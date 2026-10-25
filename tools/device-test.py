@@ -8,6 +8,7 @@ Sources are restored on exit.
     python3 tools/device-test.py [--serial SERIAL] [--only NAME ...]
 """
 import argparse
+from ui_driver import UiDriver
 import difflib
 import hashlib
 import shutil
@@ -37,10 +38,16 @@ LOADED_LABELS_CALL = ('LoadedLabels().also { '
 class Device:
     def __init__(self, serial):
         self.serial = serial
+        self.ui_driver = None
 
     def adb(self, *args, check=True):
+        if self.ui_driver is not None and args[:3] == ('exec-out', 'uiautomator', 'dump'):
+            return self.ui_driver.dump()
         command = ["adb"] + (["-s", self.serial] if self.serial else []) + list(args)
-        return subprocess.run(command, check=check, capture_output=True, text=True, timeout=90).stdout
+        output = subprocess.run(command, check=check, capture_output=True, text=True, timeout=90).stdout
+        if self.ui_driver is not None and args[:3] == ('shell', 'am', 'start') and '-n' in args:
+            self.ui_driver.wait_for_foreground(args[args.index('-n') + 1].split('/')[0])
+        return output
 
     def nodes(self):
         xml = self.adb("exec-out", "uiautomator", "dump", "/dev/tty", check=False)
@@ -257,11 +264,13 @@ def main():
     print("Starting hotRunDebug ...", flush=True)
     HOST_LOG.unlink(missing_ok=True)
     run_log = (evidence / "hotRun.log").open("w")
-    run = subprocess.Popen([str(SAMPLE / "gradlew"), "-p", str(SAMPLE), "--console=plain", "hotRunDebug"],
+    run = subprocess.Popen([str(SAMPLE / "gradlew"), "-p", str(SAMPLE), "--console=plain", "hotRunDebug", "-Pcompose.reload.devToolsHeadless=true"],
                            env=env, stdout=run_log, stderr=subprocess.STDOUT, start_new_session=True)
     results = []
     host_pid = None
+    ui_driver = UiDriver(device, evidence)
     try:
+        ui_driver.start()
         deadline = time.time() + 600
         while not (HOST_LOG.exists() and "Connected to" in HOST_LOG.read_text()):
             assert run.poll() is None, "hotRunDebug exited, see ignored hotRun.log"
@@ -365,6 +374,7 @@ def main():
                 (case_dir / "host.log").write_text(HOST_LOG.read_text()[host_position:])
             print(f"{results[-1][1]}: {name} ({results[-1][2]})", flush=True)
     finally:
+        ui_driver.close()
         for path, text in originals.items():
             path.write_text(text)
         ADDED.unlink(missing_ok=True)

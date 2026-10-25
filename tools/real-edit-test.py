@@ -20,10 +20,12 @@ import time
 import zipfile
 from types import SimpleNamespace
 from device_session import DeviceSession
+from ui_driver import UiDriver
 from development_scenarios import DevelopmentCases, DEVELOPMENT_SOURCES, GENERATED_SOURCES
 from property_scenarios import PropertyCases, PROPERTY_SOURCES
 from coroutine_scenarios import CoroutineCases, COROUTINE_SOURCES
 from repository_scenarios import RepositoryCases, REPOSITORY_SOURCES
+from integration_scenarios import IntegrationCases, INTEGRATION_SOURCES, INTEGRATION_GENERATED
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -45,13 +47,16 @@ def main():
     parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--art-dcevm-version', required=True)
-    parser.add_argument('--scenario-group', choices=['startup', 'business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'full'], default='full')
+    parser.add_argument('--scenario-group', choices=['startup', 'business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session', 'integration', 'full'], default='full')
+    parser.add_argument('--integration-groups', nargs='+', choices=['effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session'])
     args = parser.parse_args()
+    if args.integration_groups and args.scenario_group != 'integration':
+        parser.error('--integration-groups requires --scenario-group integration')
     if not args.serial:
         parser.error('Set --serial or ANDROID_SERIAL')
     if not re.fullmatch(r'[a-z0-9-]+', args.device_id) or args.device_id == args.serial:
         parser.error('--device-id must be an anonymous lowercase label')
-    for path in [ADDED, *GENERATED_SOURCES]:
+    for path in [ADDED, *GENERATED_SOURCES, *INTEGRATION_GENERATED]:
         if path.exists():
             parser.error('Refusing to overwrite ' + path.name)
     spec = importlib.util.spec_from_file_location('device_test', ROOT / 'tools/device-test.py')
@@ -63,7 +68,7 @@ def main():
     evidence = ROOT / 'build/evidence' / f'real-edits-{args.device_id}-{time.time_ns()}'
     evidence.mkdir(parents=True)
     print('Evidence: ' + str(evidence.relative_to(ROOT)), flush=True)
-    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, *PROPERTY_SOURCES, *COROUTINE_SOURCES, *REPOSITORY_SOURCES, ADDED, *GENERATED_SOURCES]
+    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, *PROPERTY_SOURCES, *COROUTINE_SOURCES, *REPOSITORY_SOURCES, *INTEGRATION_SOURCES, ADDED, *GENERATED_SOURCES, *INTEGRATION_GENERATED]
     originals = {path: path.read_bytes() if path.exists() else None for path in paths}
     results = []
     metadata = {'device': args.device_id, 'engineVersion': args.art_dcevm_version,
@@ -73,6 +78,7 @@ def main():
     candidates = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD'], cwd=ROOT, text=True).splitlines()
     candidates += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], cwd=ROOT, text=True).splitlines()
     metadata['changedSources'] = {p: sha((ROOT / p).read_bytes()) for p in sorted(set(candidates)) if (ROOT / p).is_file()}
+    (evidence / 'baseline-sources.json').write_text(json.dumps(metadata, indent=2))
     host_pid = None
     run = None
     app_pid = None
@@ -98,7 +104,10 @@ def main():
         return texts
 
     def value(texts, prefix):
-        return next(t[len(prefix):] for t in texts if t.startswith(prefix))
+        for text in texts:
+            if text.startswith(prefix):
+                return text[len(prefix):]
+        raise AssertionError('Missing UI field: ' + prefix)
 
     def invariant(listener=True):
         nonlocal listener_id
@@ -141,7 +150,7 @@ def main():
         case_dir = evidence / name
         case_dir.mkdir()
 
-    def trigger(name):
+    def trigger(name, compile_failure=False):
         new_case(name)
         diff = ''.join(''.join(difflib.unified_diff(
             (original or b'').decode().splitlines(True), path.read_text().splitlines(True) if path.exists() else [],
@@ -155,6 +164,12 @@ def main():
             completed = subprocess.run([str(SAMPLE / 'gradlew'), '-p', str(SAMPLE), '--console=plain',
                                         'reload', '-Pcompose.reload.devToolsHeadless=true'],
                                        env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=300)
+        if compile_failure:
+            assert completed.returncode != 0, 'Expected compiler rejection'
+            host = orchestration.read_text()[offset:]
+            assert 'ReloadClassesResult' not in host, 'Compiler failure sent a device update'
+            (case_dir / 'orchestration.log').write_text(host)
+            return host, time.monotonic() - start
         assert completed.returncode == 0, 'Compilation failed; inspect gradle.log'
         classes = SAMPLE / 'build/tmp/kotlin-classes/debug'
         compiled = {}
@@ -227,17 +242,21 @@ def main():
     coroutine_activity = APP + '/.CoroutineEditActivity'
     repository_only = args.scenario_group in ['repositories', 'repositories-interface']
     repository_activity = APP + '/.RepositoryEditActivity'
-    current_activity = repository_activity if repository_only else coroutine_activity if coroutine_only else property_activity if property_only else state_activity if development_only else ACTIVITY
+    integration_only = args.scenario_group in ['effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session', 'integration']
+    integration_activity = APP + '/.IntegrationEditActivity'
+    current_activity = integration_activity if integration_only else repository_activity if repository_only else coroutine_activity if coroutine_only else property_activity if property_only else state_activity if development_only else ACTIVITY
     context = SimpleNamespace(device=device, evidence=evidence, source=SOURCE, snapshot=snapshot,
                               accepted=accepted, trigger=trigger, common=common, new_case=new_case,
                               case_dir=lambda: case_dir, results=results, app_pid=lambda: app_pid,
-                              value=value, edit=regression.edit)
+                              value=value, edit=regression.edit, integration_groups=args.integration_groups)
     development = None
     session = DeviceSession(device, evidence, APP)
+    ui_driver = UiDriver(device, evidence)
     run_log = (evidence / 'hotRun.log').open('w')
     try:
         device.adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')
         device.adb('shell', 'wm', 'dismiss-keyguard')
+        ui_driver.start()
         session.start()
         with (evidence / 'prepare-probe.log').open('w') as log:
             subprocess.run([str(ROOT / 'gradlew'), ':hot-reload-android-host:prepareWorkflowProbe', '--console=plain'],
@@ -259,11 +278,13 @@ def main():
         wait(lambda: 'PROBE_READY' in orchestration.read_text(), 'orchestration observer')
         app_pid = device.adb('shell', 'pidof', APP).strip()
         session.bind_process(app_pid)
+        if device.ui_driver is not None:
+            device.ui_driver.wait_for_foreground(APP)
         # The runtime connects before Application/launcher onCreate completes. Wait for its first UI
         # before launching another Activity, otherwise the pending launcher can cover the test page.
         device.wait_for(lambda ts: 'Count: 0' in ts, 'launcher ready', timeout=60)
         device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
-        device.wait_for(lambda ts: ('Repository edits' if repository_only else 'Coroutine edits' if coroutine_only else 'Property edits' if property_only else 'Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
+        device.wait_for(lambda ts: ('Integration edits' if integration_only else 'Repository edits' if repository_only else 'Coroutine edits' if coroutine_only else 'Property edits' if property_only else 'Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
         apk_dir = SAMPLE / 'build/outputs/apk/debug'
         apk_info = json.loads((apk_dir / 'output-metadata.json').read_text())
         assert len(apk_info['elements']) == 1, 'Expected a single arm64 APK'
@@ -284,7 +305,11 @@ def main():
                         abi=device.adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
                         checkJni=device.adb('shell', 'getprop', 'debug.checkjni').strip())
         (evidence / 'startup.logcat').write_text(device.logcat())
-        if repository_only:
+        if integration_only:
+            integrations = IntegrationCases(context)
+            active_invariant = integrations.invariant
+            integrations.start()
+        elif repository_only:
             repositories = RepositoryCases(context)
             active_invariant = repositories.invariant
             repositories.start()
@@ -484,6 +509,15 @@ def main():
                 callbacks(expected['callback'], expected['control'])
                 common()
                 results.append({'name': 'return-to-original-page', 'result': 'PASS'})
+        if group in ['effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session', 'integration', 'full']:
+            if not integration_only:
+                current_activity = integration_activity
+                device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
+                device.wait_for(lambda ts: 'Integration edits' in ts, 'integration page')
+                integrations = IntegrationCases(context)
+                active_invariant = integrations.invariant
+                integrations.start()
+            integrations.run(group)
         session.check()
     except BaseException as failure:
         results.append({'name': case_dir.name if case_dir != evidence else 'startup',
@@ -497,6 +531,10 @@ def main():
         except Exception as error:
             results.append({'name': 'session-cleanup', 'result': 'FAIL', 'error': type(error).__name__})
             (evidence / 'session-cleanup-failure.txt').write_text(str(error))
+        try:
+            ui_driver.close()
+        except Exception as error:
+            results.append(dict(name="ui-driver-cleanup", result="FAIL", error=type(error).__name__))
         if app_pid:
             try:
                 (evidence / 'logcat.txt').write_text(device.logcat())

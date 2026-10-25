@@ -4,6 +4,7 @@
 python3 tools/resource-test.py --serial DEVICE [--auto] [--headless]
 """
 import argparse
+from ui_driver import UiDriver
 import importlib.util
 import json
 import os
@@ -51,6 +52,7 @@ def main():
     evidence.mkdir(parents=True)
     print(f'Evidence: {evidence.relative_to(sample.parent)}', flush=True)
     results = []
+    ui_driver = UiDriver(device, evidence)
     host_pid = None
     regression.HOST_LOG.unlink(missing_ok=True)
     log = (evidence / 'hotRun.log').open('w')
@@ -102,6 +104,7 @@ def main():
         passed(name + ' recovery')
 
     try:
+        ui_driver.start()
         wait(lambda: regression.HOST_LOG.exists() and 'Connected to' in regression.HOST_LOG.read_text(),
              'host connection', timeout=600)
         host_pid = int(re.search(r'^pid=(\d+)$', regression.PID_FILE.read_text(), re.MULTILINE).group(1))
@@ -151,6 +154,7 @@ def main():
         results.append(dict(name='resource regression', result='FAIL', note=str(failure)))
         raise
     finally:
+        ui_driver.close()
         if host_pid is not None:
             try:
                 os.kill(host_pid, signal.SIGTERM)
