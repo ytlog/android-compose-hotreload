@@ -35,11 +35,13 @@ internal fun composeInvalidation(
             } ?: true
         } ?: true
     }
+    val evaluation = CacheEvaluation(current, pending, dirtyMethods, dirtyFields)
     fun cacheReason(scope: ScopeInfo): String? {
         val code = scope.extras[ComposeScopeCode] ?: return "missing scope metadata: ${scope.methodId}"
         if (!code.parsed) return "missing cache ranges: ${scope.methodId} (${scope.group})"
         if (code.hasCache) {
-            code.directCalls.firstOrNull { it in dirtyMethods }?.let { return "cache evaluates dirty method: $it" }
+            code.directCalls.firstOrNull(evaluation::changed)?.let { return "cache evaluates changed execution: $it" }
+            code.initializers.firstOrNull(evaluation::changedInitializer)?.let { return "cache evaluates changed class initializer: $it" }
             code.fields.firstOrNull { it in dirtyFields }?.let { return "cache reads dirty field: $it" }
         }
         return scope.children.firstNotNullOfOrNull(::cacheReason)

@@ -88,6 +88,9 @@ internal fun executeReload(loader: ClassLoader, codeCacheDir: File, reload: Prot
             }
 
             /* upstream 'compose.kt': invalidate the groups after a successful reload */
+            if (reload.recomposedGroupKeys.isNotEmpty()) {
+                refreshAndroidViewsAfterRecompose(loader)
+            }
             reload.invalidatedGroupKeys.forEach { key ->
                 Log.d(TAG, "Invalidating group '$key'")
                 invalidateGroupsWithKey(loader, key)

@@ -134,15 +134,27 @@ class InteropCases:
         self.click(); self.common()
         self.r.passed('androidview-original-native-state')
         self.r.edit('InteropLogic.kt', 'update-v1', 'update-v2')
-        self.r.reload('androidview-stable-update-not-replayed')
+        self.r.reload('androidview-stable-update-refreshes')
+        self.update_note = 'v2'
         self.common()
-        self.r.passed('androidview-stable-update-not-replayed', reload=True,
-                      boundary='A stable AndroidView update callback is not automatically replayed')
+        self.r.passed('androidview-stable-update-refreshes', reload=True)
         self.label = 'v2'
         self.update_note = 'v2'
         self.edit('androidview-update-retains-editor', 'Native label v1', 'Native label v2', self.click)
         self.business = 'v2'
         self.edit('androidview-retained-listener-business', 'native-business-v1:', 'native-business-v2:', self.click)
+        # A failing update must report through tooling, keep the old native tree alive,
+        # and recover on the next source edit without creating a new state owner.
+        offset = self.r.orchestration.stat().st_size
+        self.r.edit('InteropLogic.kt', '"update-v2"', 'error("Interop update failure")')
+        self.r.reload('androidview-update-error-keeps-state')
+        self.r.wait(lambda: 'MESSAGE UIException' in self.r.orchestration.read_text()[offset:],
+                    'native update exception reported to tooling')
+        self.common()
+        self.r.passed('androidview-update-error-keeps-state', reload=True)
+        self.update_note = 'v3'
+        self.edit('androidview-update-error-recovery', 'error("Interop update failure")', '"update-v3"', self.click)
+
 
     def native_listener(self):
         self.r.new_case('native-listener-original-watcher')

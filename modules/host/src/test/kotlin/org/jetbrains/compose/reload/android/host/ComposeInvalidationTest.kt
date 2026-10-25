@@ -16,11 +16,18 @@ class ComposeInvalidationTest {
     private fun app(text: String = "before", childKey: Int = 200, includeGroup: Boolean = true,
                     cache: Boolean = false, helper: String = "old", lambda: Boolean = false,
                     cacheField: Boolean = false, initial: String = "old field",
-                    outside: Boolean = false, debug: Boolean = true, keyComparison: Int = 0) =
+                    outside: Boolean = false, debug: Boolean = true, keyComparison: Int = 0,
+                    factory: Boolean = false, invoke: Boolean = false, eager: Boolean = false,
+                    classLambda: Boolean = false, library: Boolean = false, initializer: String? = null) =
         MutableApplicationInfo().apply {
             add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
                 visit(V11, ACC_PUBLIC, "fixture/Screen", null, "java/lang/Object", null)
                 visitField(ACC_PUBLIC or ACC_STATIC or ACC_FINAL, "initial", "Ljava/lang/String;", null, initial).visitEnd()
+                if (initializer != null) visitMethod(ACC_STATIC, "<clinit>", "()V", null, null).apply {
+                    visitCode(); visitLdcInsn(initializer)
+                    visitFieldInsn(PUTSTATIC, "fixture/Screen", "initial", "Ljava/lang/String;")
+                    visitInsn(RETURN); visitMaxs(0, 0); visitEnd()
+                }
                 visitMethod(ACC_PUBLIC or ACC_STATIC, "Screen", "(Landroidx/compose/runtime/Composer;)V", null, null).apply {
                     visitCode()
                     fun start(key: Int) {
@@ -92,11 +99,103 @@ class ComposeInvalidationTest {
                     visitEnd()
                 }
                 visitMethod(ACC_PUBLIC or ACC_STATIC, "helper", "()Ljava/lang/String;", null, null).apply {
+                    visitCode()
+                    if (factory) {
+                        visitMethodInsn(INVOKESTATIC, "fixture/Screen", "factory", "()Ljava/util/function/Supplier;", false)
+                        if (library) {
+                            visitMethodInsn(INVOKESTATIC, "library/Consumer", "consume", "(Ljava/util/function/Supplier;)Ljava/lang/String;", false)
+                        } else if (invoke) {
+                            visitMethodInsn(INVOKEINTERFACE, "java/util/function/Supplier", "get", "()Ljava/lang/Object;", true)
+                            visitTypeInsn(CHECKCAST, "java/lang/String")
+                        } else { visitInsn(POP); visitLdcInsn("holder") }
+                    } else visitLdcInsn(helper)
+                    visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                }
+                if (factory) {
+                    visitMethod(ACC_PUBLIC or ACC_STATIC, "callback", "()Ljava/lang/String;", null, null).apply {
+                        visitCode(); visitLdcInsn(helper); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                    }
+                    visitMethod(ACC_PUBLIC or ACC_STATIC, "factory", "()Ljava/util/function/Supplier;", null, null).apply {
+                        visitCode()
+                        if (eager) {
+                            visitMethodInsn(INVOKESTATIC, "fixture/Screen", "callback", "()Ljava/lang/String;", false)
+                            visitInsn(POP)
+                        }
+                        if (classLambda) {
+                            visitTypeInsn(NEW, "fixture/Listener"); visitInsn(DUP)
+                            visitMethodInsn(INVOKESPECIAL, "fixture/Listener", "<init>", "()V", false)
+                        } else visitInvokeDynamicInsn("get", "()Ljava/util/function/Supplier;",
+                            Handle(H_INVOKESTATIC, "java/lang/invoke/LambdaMetafactory", "metafactory",
+                                "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;", false),
+                            Type.getMethodType("()Ljava/lang/Object;"),
+                            Handle(H_INVOKESTATIC, "fixture/Screen", "callback", "()Ljava/lang/String;", false),
+                            Type.getMethodType("()Ljava/lang/String;"))
+                        visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                    }
+                }
+                visitEnd()
+            }.toByteArray())))
+            if (classLambda) add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
+                visit(V11, ACC_PUBLIC, "fixture/Listener", null, "java/lang/Object", arrayOf("java/util/function/Supplier"))
+                visitMethod(ACC_PUBLIC, "<init>", "()V", null, null).apply {
+                    visitCode(); visitVarInsn(ALOAD, 0)
+                    visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
+                    visitInsn(RETURN); visitMaxs(0, 0); visitEnd()
+                }
+                visitMethod(ACC_PUBLIC, "get", "()Ljava/lang/Object;", null, null).apply {
                     visitCode(); visitLdcInsn(helper); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
                 }
                 visitEnd()
             }.toByteArray())))
         }
+
+    @Test
+    fun `opaque library accepting a callback must conservatively reset`() {
+        for (classLambda in listOf(false, true)) {
+            val before = app(cache = true, factory = true, library = true, classLambda = classLambda)
+            val after = app(cache = true, factory = true, library = true, classLambda = classLambda, helper = "new callback")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(intArrayOf(100), composeInvalidation(before, after, dirty).reset)
+        }
+    }
+
+    @Test
+    fun `static initializer read directly or through a helper must reset`() {
+        for (field in listOf(false, true)) {
+            val before = app(cache = true, cacheField = field, initializer = "old value")
+            val after = app(cache = true, cacheField = field, initializer = "new value")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(intArrayOf(100), composeInvalidation(before, after, dirty).reset)
+        }
+    }
+
+    @Test
+    fun `transitively dirty callback factory is not evaluated callback execution`() {
+        for (classLambda in listOf(false, true)) {
+            val before = app(cache = true, factory = true, classLambda = classLambda)
+            val after = app(cache = true, factory = true, classLambda = classLambda, helper = "new callback")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(intArrayOf(), composeInvalidation(before, after, dirty).reset)
+        }
+    }
+
+    @Test
+    fun `callback actually invoked during cached initialization must reset`() {
+        for (classLambda in listOf(false, true)) {
+            val before = app(cache = true, factory = true, invoke = true, classLambda = classLambda)
+            val after = app(cache = true, factory = true, invoke = true, classLambda = classLambda, helper = "new callback")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(intArrayOf(100), composeInvalidation(before, after, dirty).reset)
+        }
+    }
+
+    @Test
+    fun `factory computing a value before returning a callback must reset`() {
+        val before = app(cache = true, factory = true, eager = true)
+        val after = app(cache = true, factory = true, eager = true, helper = "new evaluated value")
+        val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+        assertContentEquals(intArrayOf(100), composeInvalidation(before, after, dirty).reset)
+    }
 
     @Test
     fun `unchanged caller of dirty dependency recomposes without resetting its keyed children`() {

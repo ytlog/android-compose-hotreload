@@ -10,10 +10,31 @@ import org.jetbrains.compose.reload.core.with
 import org.objectweb.asm.tree.FieldInsnNode
 import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MethodNode
+import org.objectweb.asm.Opcodes.*
+import org.objectweb.asm.Type
+import org.objectweb.asm.Handle
+import org.objectweb.asm.tree.InvokeDynamicInsnNode
+import org.objectweb.asm.tree.TypeInsnNode
+import org.objectweb.asm.tree.AbstractInsnNode
+
+internal data class ExecutedCall(val method: MethodId, val virtual: Boolean)
+internal data class DeferredCall(val type: ClassId, val call: ExecutedCall)
+
+/** JVM invocation edges, excluding lambda implementation handles (creation is not invocation). */
+internal data class MethodExecutionCode(
+    val calls: Set<ExecutedCall>,
+    val fields: Set<FieldId>,
+    val initializers: Set<ClassId>,
+    val deferred: Set<DeferredCall>,
+    val known: Boolean,
+) {
+    companion object Key : Context.Key.Optional<MethodExecutionCode>()
+}
 
 internal data class ComposeScopeCode(
     val hasCache: Boolean,
-    val directCalls: Set<MethodId>,
+    val directCalls: Set<ExecutedCall>,
+    val initializers: Set<ClassId>,
     val fields: Set<FieldId>,
     val parsed: Boolean,
 ) {
@@ -42,11 +63,40 @@ class ComposeScopeAnalyzer : ScopeAnalyzerExtension {
             if (bodies.isEmpty()) parsed = false // Stripped/unknown cache debug ranges: retain reset semantics.
             bodies.flatMap { range -> methodCode.subList(range.first, range.last + 1) }
         }
-        return Context(ComposeScopeCode with ComposeScopeCode(
+        val dynamic = methodCode.filterIsInstance<InvokeDynamicInsnNode>()
+        val execution = MethodExecutionCode(
+            calls = methodCode.filterIsInstance<MethodInsnNode>().map {
+                ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc), it.opcode == INVOKEVIRTUAL || it.opcode == INVOKEINTERFACE)
+            }.toSet(),
+            fields = methodCode.filterIsInstance<FieldInsnNode>().filter { it.opcode == GETFIELD || it.opcode == GETSTATIC }
+                .map { FieldId(ClassId(it.owner), it.name, it.desc) }.toSet(),
+            initializers = initializers(methodCode),
+            deferred = dynamic.filter { it.bsm.owner == "java/lang/invoke/LambdaMetafactory" }.flatMap { indy ->
+                indy.bsmArgs.filterIsInstance<Handle>().map {
+                    DeferredCall(ClassId(Type.getReturnType(indy.desc).internalName),
+                        ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc),
+                            it.tag == H_INVOKEVIRTUAL || it.tag == H_INVOKEINTERFACE))
+                }
+            }.toSet(),
+            known = dynamic.all { it.bsm.owner in setOf("java/lang/invoke/LambdaMetafactory", "java/lang/invoke/StringConcatFactory") },
+        )
+        return Context(MethodExecutionCode with execution, ComposeScopeCode with ComposeScopeCode(
             hasCache = cacheCalls.isNotEmpty(),
-            directCalls = evaluation.filterIsInstance<MethodInsnNode>().map { MethodId(ClassId(it.owner), it.name, it.desc) }.toSet(),
+            directCalls = evaluation.filterIsInstance<MethodInsnNode>().map {
+                ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc), it.opcode == INVOKEVIRTUAL || it.opcode == INVOKEINTERFACE)
+            }.toSet(),
+            initializers = initializers(evaluation),
             fields = evaluation.filterIsInstance<FieldInsnNode>().map { FieldId(ClassId(it.owner), it.name, it.desc) }.toSet(),
             parsed = parsed,
         ))
     }
 }
+
+private fun initializers(code: List<AbstractInsnNode>): Set<ClassId> = code.mapNotNull {
+    when {
+        it is TypeInsnNode && it.opcode == NEW -> ClassId(it.desc)
+        it is FieldInsnNode && it.opcode == GETSTATIC -> ClassId(it.owner)
+        it is MethodInsnNode && it.opcode == INVOKESTATIC -> ClassId(it.owner)
+        else -> null
+    }
+}.toSet()

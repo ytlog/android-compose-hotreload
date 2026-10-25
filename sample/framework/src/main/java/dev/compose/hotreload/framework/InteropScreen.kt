@@ -16,8 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 object InteropAudit {
     var factories by mutableIntStateOf(0)
@@ -33,7 +31,7 @@ fun interopAuditSummary(): String = with(InteropAudit) {
     "$factories:$releases:$registrations:$unregistrations:$children:$destroyed:$clean"
 }
 
-class InteropState : ViewModel() {
+class InteropState {
     val identity = token()
     val click = nativeClick(this)
     val watcher = nativeWatcher(this)
@@ -66,10 +64,7 @@ class InteropState : ViewModel() {
 @Composable
 fun InteropScreen() {
     val activity = LocalContext.current as ComponentActivity
-    // Navigation's ViewModelStore owns callbacks independently of Compose cache invalidation.
-    val state: InteropState = viewModel()
-    // Normal state-driven update: a changed Compose input creates a changed update callback.
-    val label = nativeLabel()
+    val state = remember { InteropState() }
     DisposableEffect(state) {
         // Explicit registry ownership: valid without a LifecycleOwner, with mandatory unregister.
         // Registration is outside update/recomposition; the registry retains the original callback.
@@ -102,8 +97,7 @@ fun InteropScreen() {
                 InteropAudit.factories++
             }
         }, onRelease = { state.release(it) }, update = { view ->
-            state.button.text = label
-            // Deliberately no Compose input: editing only this helper does not replay update.
+            state.button.text = nativeLabel()
             state.editor.contentDescription = nativeUpdateNote()
             state.anchors = view === state.container && view.getChildAt(0) === state.button &&
                 view.getChildAt(1) === state.editor
