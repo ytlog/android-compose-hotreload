@@ -42,6 +42,7 @@ public final class Driver extends Instrumentation {
         xml.append("<node text=\"").append(escape(node.getText()))
             .append("\" class=\"").append(escape(node.getClassName()))
             .append("\" package=\"").append(escape(node.getPackageName()))
+            .append("\" content-desc=\"").append(escape(node.getContentDescription()))
             .append("\" bounds=\"[").append(bounds.left).append(',').append(bounds.top)
             .append("][").append(bounds.right).append(',').append(bounds.bottom).append("]\">");
         for (int i = 0; i < node.getChildCount(); i++) {
