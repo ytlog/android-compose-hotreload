@@ -84,5 +84,6 @@ class ImeDriver:
             self.d.adb('shell', 'ime', 'set', self.original)
             assert self.d.adb('shell', 'settings', 'get', 'secure', 'default_input_method').strip() == self.original
         if self.enabled_here: self.d.adb('shell', 'ime', 'disable', COMPONENT)
-        if self.installed_here: self.d.adb('uninstall', PACKAGE)
-        (self.evidence / 'ime-cleanup.json').write_text(json.dumps({'originalRestored': bool(self.original and self.original != 'null'), 'removedTaskInstallation': self.installed_here}))
+        # Keep the fixed-package helper installed to avoid repeated OEM install approvals.
+        # It is no longer selected (and is disabled if this run enabled it).
+        (self.evidence / 'ime-cleanup.json').write_text(json.dumps({'originalRestored': bool(self.original and self.original != 'null'), 'removedTaskInstallation': False, 'retainedTaskInstallation': self.installed_here}))

@@ -47,7 +47,7 @@ def main():
         out=evidence/stage;out.mkdir()
         environment=dict(env,FRAMEWORK_CLASSPATH_REPORT=str(out/'classpath.json'))
         with (out/'gradle.log').open('w') as log:
-            subprocess.run([str(SAMPLE/'gradlew'),'-p',str(SAMPLE),'-I',str(init),':framework:inspectFrameworkHotInputs','--console=plain'],
+            subprocess.run([str(SAMPLE/'gradlew'),'-p',str(SAMPLE),'-I',str(init),':framework:inspectFrameworkHotInputs','--console=plain','-Pcompose.reload.frameworkFixture=true'],
                 cwd=ROOT,env=environment,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=600)
         classes={}
         for raw in json.loads((out/'classpath.json').read_text()):

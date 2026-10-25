@@ -1,7 +1,8 @@
 # Navigation、Hilt、Room 与输入状态的定向验证
 
 `sample/framework` 是独立应用模块，应用 ID 为 `dev.compose.hotreload.framework`。
-它不向原 sample APK 添加 Hilt、Navigation 或 Room 依赖。测试经正常 Kotlin／KSP／
+该模块仅在 `-Pcompose.reload.frameworkFixture=true` 时加入构建，两个专用 runner 自动传入该参数。
+原 sample 的未限定任务不会连带安装／启动这个应用，也不会添加 Hilt、Navigation 或 Room 依赖。测试经正常 Kotlin／KSP／
 Hilt／D8 构建和现有热更新主机，在同一进程连续更新；原始日志与生成源码仅保存在
 忽略的 `build/evidence/`。本文说明验收契约，设备结论另记本地验证记录。
 
@@ -15,8 +16,11 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
 ```
 
 这里的 `all` **只运行本页新增的四组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room` 或 `input` 单组定位。两台设备在同一 checkout
+可以选择 `navigation`、`hilt`、`room` 或 `input` 单组定位，也可以用
+`--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
+多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
+本地 upstream Maven 产物；每台设备内部仍串行执行。
 
 Hilt／KSP 插件在 sample 根构建仅声明 `apply false`，避免父子插件类加载器选择不同的
 JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `ScopedArtifact.CLASSES`
@@ -39,14 +43,20 @@ JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `Scoped
 | input | 提交组合文本，在选区存在时更新，再继续输入 | 选区保持；后续中文输入只替换选区，提交结束 composition，回调读取新草稿；不能用程序设置应用状态替代输入法链路 |
 
 每次正常编辑后请求 GC、切换前后台，并检查精确的订阅／退订与行值事件。
+退到桌面后读取当前进程的夹具事件日志，确认 Flow 实际取消订阅再恢复页面，避免用固定
+延时假定系统已结束 Activity 的退出动画。
 输入组在组合区间和选区断言完成之前不切后台，因为失焦本身可以合法结束组合输入；
 完成输入后再验证 GC 和前后台切换。安装 APK、Maven Local AAR 及内部引擎哈希必须匹配。
 
 ## 输入法与设备准备
 
+仅选择输入组时安装／启用测试 IME；其他组用系统按键输入草稿，不更换设备输入法；若现有键盘转换了输入，记录实际非空
+草稿并对后续保留／查询值做精确断言。中文组合、选区与提交行为只由输入组的专用 IME 验收。
 输入组使用独立、测试专用 IME，向真实 InputConnection 发送确定的中文组合与提交操作。
 它不是应用内 setter，也不模拟第三方输入法的拼音候选引擎。小米／其他 OEM 的安装确认
-必须在验收开始前完成。runner 保存原默认输入法，退出时恢复；安装与配置证据留在忽略目录。
+必须在验收开始前完成。runner 保存原默认输入法，退出时恢复并撤销本轮新增的启用设置；保留固定包名的辅助 APK，
+后续核对哈希后复用，避免每轮重新安装触发 OEM 确认。验证应用也固定包名：先编译并核对
+已安装 APK 哈希，仅在不一致时安装；随后启动主机跳过重复安装任务。安装与配置证据留在忽略目录。
 测试 IME 的命令接收器要求发送方具有 `android.permission.DUMP`，且仅操作 framework 包的
 活动编辑器；普通应用不能发送控制命令。
 

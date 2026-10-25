@@ -96,8 +96,13 @@ class Cases:
         self.events = Counter({f'create:{self.model}:42': 1, f'enter:{self.model}': 1,
                                f'subscribe:{self.model}': 1, f'row:{self.model}:empty': 1})
         self.field()
-        self.r.ime.command('commit', self.text)
+        self.r.seed_text(self.text)
         self.d.tap_text('Ready')
+        if not self.r.ime:
+            # A user's keyboard may convert injected Latin keys into candidate text.
+            # Framework groups retain that actual entered draft; exact IME edits have their own group.
+            self.text = self.get(self.values(), 'Text: ')
+            assert self.text, 'System keyboard produced no draft'
         self.settle()
 
     def common(self):
@@ -106,8 +111,14 @@ class Cases:
         self.d.tap_text('GC: ')
         self.d.wait_for(lambda t: 'GC: ' + str(gc+1) in t, 'GC complete')
         self.d.adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
-        # Wait until the actual lifecycle-bound collector has stopped before resuming.
-        time.sleep(.5)
+        # HOME animations may keep the Activity STARTED for longer than a fixed delay.
+        # Observe the actual collector cancellation without querying a background window.
+        expected = self.events['unsubscribe:' + self.model] + 1
+        def stopped():
+            events = self.d.adb('logcat', '-d', '--pid=' + self.r.pid,
+                                '-v', 'raw', '-s', 'FrameworkLedger:I', '*:S').splitlines()
+            return events.count('unsubscribe:' + self.model) == expected
+        self.r.wait(stopped, 'lifecycle collector cancellation after HOME', timeout=30)
         self.event('unsubscribe')
         self.event('subscribe')
         self.events[f'row:{self.model}:{self.row}'] += 1
@@ -178,6 +189,7 @@ class Cases:
         self.step('navigation-review-pop-retains-entry', review)
         def new_entry():
             old = dict(self.identities)
+            persisted = self.row
             self.d.tap_text('Back')
             self.d.wait_for(lambda t: 'Draft list' in t, 'pop detail')
             self.event('leave'); self.event('unsubscribe'); self.event('clear')
@@ -196,15 +208,19 @@ class Cases:
             self.d.tap_text('Back'); self.d.wait_for(lambda t: 'Draft list' in t, 'pop 43')
             self.event('leave'); self.event('unsubscribe'); self.event('clear')
             self.d.tap_text('Open 42')
-            texts = self.d.wait_for(lambda t: 'Id: 42' in t and 'Row: draft42' in t, 'persisted singleton database')
+            texts = self.d.wait_for(lambda t: 'Id: 42' in t and 'Row: ' + persisted in t, 'persisted singleton database')
             self.model = self.get(texts, 'Model: ')
             self.identities.update({p:self.get(texts,p) for p in ['Entry: ', 'Model: ', 'Local: ']})
             assert self.model != old['Model: ']
-            self.row = 'draft42'
+            self.row = persisted
             self.events[f'create:{self.model}:42'] += 1
             self.event('enter'); self.event('subscribe'); self.events[f'row:{self.model}:{self.row}'] += 1
-            self.field(); self.r.ime.command('commit', 'draft42'); self.text = 'draft42'
-            self.d.tap_text('Ready'); self.settle()
+            self.field(); self.r.seed_text('draft42'); self.text = 'draft42'
+            self.d.tap_text('Ready')
+            if not self.r.ime:
+                self.text = self.get(self.values(), 'Text: ')
+                assert self.text, 'System keyboard produced no draft'
+            self.settle()
         self.step('navigation-new-entry-and-cleared-viewmodel', new_entry)
 
     def hilt(self):
@@ -284,7 +300,8 @@ class Runner:
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         module.APP=APP
         self.device=module.Device(args.serial)
-        self.ui=UiDriver(self.device,self.evidence);self.ime=ImeDriver(self.device,self.evidence)
+        self.ui=UiDriver(self.device,self.evidence)
+        self.ime=ImeDriver(self.device,self.evidence) if any(g in args.scenario_group for g in ['all','input']) else None
         self.session=DeviceSession(self.device,self.evidence,APP)
         self.environment=dict(os.environ,ANDROID_SERIAL=args.serial,ORG_GRADLE_PROJECT_artDcevmVersion=args.art_dcevm_version)
         self.originals={p:p.read_bytes() for p in SOURCE.glob('*') if p.is_file()}
@@ -304,7 +321,7 @@ class Runner:
 
     def gradle(self,*tasks,log,timeout=600):
         return subprocess.run([str(SAMPLE/'gradlew'),'-p',str(SAMPLE),'--console=plain',*tasks,
-            '-Pcompose.reload.devToolsHeadless=true'],cwd=ROOT,env=self.environment,stdout=log,stderr=subprocess.STDOUT,timeout=timeout)
+            '-Pcompose.reload.devToolsHeadless=true','-Pcompose.reload.frameworkFixture=true'],cwd=ROOT,env=self.environment,stdout=log,stderr=subprocess.STDOUT,timeout=timeout)
 
     def wait(self,predicate,description,timeout=180):
         end=time.monotonic()+timeout
@@ -366,21 +383,41 @@ class Runner:
         if self.elapsed is not None:result['reloadSeconds']=self.elapsed
         self.results.append(result);print('PASS: '+name,flush=True)
 
+    def seed_text(self, text):
+        if self.ime:
+            self.ime.command('commit', text)
+        else:
+            assert re.fullmatch('[a-zA-Z0-9]+', text), 'Only ASCII fixture seed uses shell key input'
+            self.device.adb('shell', 'input', 'text', text)
+
     def start(self):
         self.device.adb('shell','input','keyevent','KEYCODE_WAKEUP')
         self.device.adb('shell','wm','dismiss-keyguard')
         # Helper install/IME setup precede input-monitored acceptance.
-        self.ui.start();self.ime.start()
+        self.ui.start()
+        if self.ime:self.ime.start()
+        # Reuse the exact installed baseline when possible; never reinstall on reload.
         # OEM first-install confirmations belong to setup, before physical-input monitoring.
-        with (self.evidence/'install-framework.log').open('w') as log:
-            assert self.gradle(':framework:installDebug',log=log).returncode == 0, 'Framework APK installation failed'
+        with (self.evidence/'build-framework.log').open('w') as log:
+            assert self.gradle(':framework:assembleDebug',log=log).returncode == 0, 'Framework APK build failed'
+        apk_dir=MODULE/'build/outputs/apk/debug'
+        info=json.loads((apk_dir/'output-metadata.json').read_text());assert len(info['elements'])==1
+        apk=apk_dir/info['elements'][0]['outputFile']
+        installed=self.device.adb('shell','pm','path',APP,check=False).strip().removeprefix('package:')
+        reused=bool(installed and self.device.adb('shell','sha256sum',installed).split()[0]==sha(apk.read_bytes()))
+        if not reused:
+            with (self.evidence/'install-framework.log').open('w') as log:
+                subprocess.run(['adb','-s',self.args.serial,'install','--no-incremental','-r',str(apk)],
+                    stdout=log,stderr=subprocess.STDOUT,check=True,timeout=90)
+        (self.evidence/'installation.json').write_text(json.dumps({'package':APP,'reusedInstalledApk':reused,
+            'apkSha256':sha(apk.read_bytes())}))
         self.session.start()
         with (self.evidence/'prepare-probe.log').open('w') as log:
             subprocess.run([str(ROOT/'gradlew'),':hot-reload-android-host:prepareWorkflowProbe','--console=plain'],cwd=ROOT,
                 env=self.environment,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=300)
         self.host_log.unlink(missing_ok=True)
         self.run=subprocess.Popen([str(SAMPLE/'gradlew'),'-p',str(SAMPLE),'--console=plain',':framework:hotRunDebug',
-            '-Pcompose.reload.devToolsHeadless=true'],cwd=ROOT,env=self.environment,stdout=self.log('hotRun.log'),stderr=subprocess.STDOUT,start_new_session=True)
+            '-Pcompose.reload.devToolsHeadless=true','-Pcompose.reload.frameworkFixture=true','-x',':framework:installDebug'],cwd=ROOT,env=self.environment,stdout=self.log('hotRun.log'),stderr=subprocess.STDOUT,start_new_session=True)
         self.wait(lambda:self.host_log.exists() and 'Connected to' in self.host_log.read_text(),'host connection',600)
         props=dict(l.split('=',1) for l in (MODULE/'build/run/debug/debug.pid').read_text().splitlines() if '=' in l)
         self.host_pid=int(props['pid'])
@@ -390,9 +427,7 @@ class Runner:
         self.probe=subprocess.Popen(['java','-cp',cp,'org.jetbrains.compose.reload.android.host.tooling.WorkflowProbeKt',props['orchestration.port']],
             stdin=subprocess.PIPE,stdout=self.log('orchestration.log'),stderr=subprocess.STDOUT,text=True)
         self.wait(lambda:'PROBE_READY' in self.orchestration.read_text(),'orchestration observer')
-        apk_dir=MODULE/'build/outputs/apk/debug'
-        info=json.loads((apk_dir/'output-metadata.json').read_text());assert len(info['elements'])==1
-        apk=apk_dir/info['elements'][0]['outputFile'];shutil.copyfile(apk,self.evidence/'installed-base.apk')
+        shutil.copyfile(apk,self.evidence/'installed-base.apk')
         installed=self.device.adb('shell','pm','path',APP).strip().removeprefix('package:')
         apk_hash=self.device.adb('shell','sha256sum',installed).split()[0];assert apk_hash==sha(apk.read_bytes())
         aar=Path.home()/'.m2/repository/io/github/ytlog/artdcevm'/self.args.art_dcevm_version/f'artdcevm-{self.args.art_dcevm_version}.aar'
@@ -433,7 +468,7 @@ class Runner:
         try:
             # End monitoring before restoration so cleanup works after a rejected session too.
             cleanup('session', self.session.close)
-            cleanup('ime', self.ime.close)
+            if self.ime:cleanup('ime', self.ime.close)
             cleanup('ui', self.ui.close)
             if self.host_log.exists():
                 cleanup('host-log', lambda: shutil.copyfile(self.host_log, self.evidence/'host.log'))
@@ -454,15 +489,18 @@ def main():
     parser.add_argument('--serial',default=os.getenv('ANDROID_SERIAL'))
     parser.add_argument('--device-id',required=True)
     parser.add_argument('--art-dcevm-version',required=True)
-    parser.add_argument('--scenario-group',choices=GROUPS+['all'],default='all')
+    parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
     args=parser.parse_args()
     if not args.serial or not re.fullmatch('[a-z0-9-]+',args.device_id) or args.device_id==args.serial:
         parser.error('Select a device and supply a separate anonymous --device-id')
+    if 'all' in args.scenario_group and len(args.scenario_group) != 1:
+        parser.error('Use all alone, or list only the groups still requiring verification')
+    groups = GROUPS if args.scenario_group == ['all'] else list(dict.fromkeys(args.scenario_group))
     runner=Runner(args)
     try:
         runner.start();cases=Cases(runner);cases.start()
         runner.passed('framework-startup')
-        for group in GROUPS if args.scenario_group=='all' else [args.scenario_group]:getattr(cases,group)()
+        for group in groups:getattr(cases,group)()
         runner.session.check()
     except BaseException as error:
         runner.results.append(dict(name=runner.case.name if runner.case!=runner.evidence else 'startup',result='FAIL',error=type(error).__name__))

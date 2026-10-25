@@ -51,5 +51,7 @@ includeBuild("..")
 
 include(":lib")
 
-// Isolated APK for framework integration; does not add dependencies to the original sample.
-include(":framework")
+// Keep unqualified sample tasks from also launching/installing the integration fixture.
+if (providers.gradleProperty("compose.reload.frameworkFixture").orNull == "true") {
+    include(":framework")
+}
