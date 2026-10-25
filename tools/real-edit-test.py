@@ -2,7 +2,7 @@
 """Continuous Kotlin -> D8 -> live Compose edits, restoring sources on exit.
 
 python3 tools/real-edit-test.py --serial DEVICE --device-id local-apiNN \
-    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|coroutines|coroutines-recovery|full]
+    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|coroutines|coroutines-recovery|repositories|repositories-interface|full]
 Raw output stays in ignored build/evidence/. No reinstall or restart between edits.
 """
 import argparse
@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from development_scenarios import DevelopmentCases, DEVELOPMENT_SOURCES, GENERATED_SOURCES
 from property_scenarios import PropertyCases, PROPERTY_SOURCES
 from coroutine_scenarios import CoroutineCases, COROUTINE_SOURCES
+from repository_scenarios import RepositoryCases, REPOSITORY_SOURCES
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -43,7 +44,7 @@ def main():
     parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--art-dcevm-version', required=True)
-    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'full'], default='full')
+    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'full'], default='full')
     args = parser.parse_args()
     if not args.serial:
         parser.error('Set --serial or ANDROID_SERIAL')
@@ -61,7 +62,7 @@ def main():
     evidence = ROOT / 'build/evidence' / f'real-edits-{args.device_id}-{time.time_ns()}'
     evidence.mkdir(parents=True)
     print('Evidence: ' + str(evidence.relative_to(ROOT)), flush=True)
-    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, *PROPERTY_SOURCES, *COROUTINE_SOURCES, ADDED, *GENERATED_SOURCES]
+    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, *PROPERTY_SOURCES, *COROUTINE_SOURCES, *REPOSITORY_SOURCES, ADDED, *GENERATED_SOURCES]
     originals = {path: path.read_bytes() if path.exists() else None for path in paths}
     results = []
     metadata = {'device': args.device_id, 'engineVersion': args.art_dcevm_version,
@@ -223,7 +224,9 @@ def main():
     property_activity = APP + '/.PropertyEditActivity'
     coroutine_only = args.scenario_group in ['coroutines', 'coroutines-recovery']
     coroutine_activity = APP + '/.CoroutineEditActivity'
-    current_activity = coroutine_activity if coroutine_only else property_activity if property_only else state_activity if development_only else ACTIVITY
+    repository_only = args.scenario_group in ['repositories', 'repositories-interface']
+    repository_activity = APP + '/.RepositoryEditActivity'
+    current_activity = repository_activity if repository_only else coroutine_activity if coroutine_only else property_activity if property_only else state_activity if development_only else ACTIVITY
     context = SimpleNamespace(device=device, evidence=evidence, source=SOURCE, snapshot=snapshot,
                               accepted=accepted, trigger=trigger, common=common, new_case=new_case,
                               case_dir=lambda: case_dir, results=results, app_pid=lambda: app_pid,
@@ -256,7 +259,7 @@ def main():
         # before launching another Activity, otherwise the pending launcher can cover the test page.
         device.wait_for(lambda ts: 'Count: 0' in ts, 'launcher ready', timeout=60)
         device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
-        device.wait_for(lambda ts: ('Coroutine edits' if coroutine_only else 'Property edits' if property_only else 'Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
+        device.wait_for(lambda ts: ('Repository edits' if repository_only else 'Coroutine edits' if coroutine_only else 'Property edits' if property_only else 'Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
         apk_dir = SAMPLE / 'build/outputs/apk/debug'
         apk_info = json.loads((apk_dir / 'output-metadata.json').read_text())
         assert len(apk_info['elements']) == 1, 'Expected a single arm64 APK'
@@ -277,7 +280,11 @@ def main():
                         abi=device.adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
                         checkJni=device.adb('shell', 'getprop', 'debug.checkjni').strip())
         (evidence / 'startup.logcat').write_text(device.logcat())
-        if coroutine_only:
+        if repository_only:
+            repositories = RepositoryCases(context)
+            active_invariant = repositories.invariant
+            repositories.start()
+        elif coroutine_only:
             coroutines = CoroutineCases(context)
             active_invariant = coroutines.invariant
             coroutines.start()
@@ -436,6 +443,18 @@ def main():
                 coroutines.run_recovery()
             else:
                 coroutines.run()
+        if group in ['repositories', 'repositories-interface', 'full']:
+            if not repository_only:
+                current_activity = repository_activity
+                device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
+                device.wait_for(lambda ts: 'Repository edits' in ts, 'repository page')
+                repositories = RepositoryCases(context)
+                active_invariant = repositories.invariant
+                repositories.start()
+            if group == 'repositories-interface':
+                repositories.add_abstract()
+            else:
+                repositories.run()
         if group in ['compose-state', 'compose-recovery', 'refactoring', 'full']:
             if development is None:
                 current_activity = state_activity

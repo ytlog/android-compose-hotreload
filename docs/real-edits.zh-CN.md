@@ -46,6 +46,7 @@ python3 tools/real-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN
 | `compose-recovery` | 单独运行 `compose-state` 的行标签／拒绝／重试三步，以缩小失败范围 |
 | `refactoring` | 修改 Kotlin／Java 参数与返回描述符，追加返回类，跨文件移动辅助方法，重命名 Java 方法；同批拒绝／重试后恢复原签名，持续调用原服务对象 |
 | `coroutines` | suspend／协程／Flow 的旧任务、新任务、请求与回调计数、取消、异常及失败恢复 |
+| `repositories` | Repository 接口、实现、默认方法、Koin 单例／工厂／构造注入、Java 动态代理及同批拒绝恢复 |
 | `properties` | ViewModel／业务属性初始化、getter、新增与改型、委托属性及 data class；比较旧新对象与失败恢复 |
 | `full` | 在同一进程执行所有组，最后返回原页面再次调用原监听器 |
 
@@ -59,7 +60,7 @@ python3 tools/real-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN
 
 签名用例同步重编 Kotlin 调用方与 Java 被调用方，持续调用最初的 Java 服务对象，分别断言结果与真实返回类型。跨文件移动方法会改变 ClassFile 所有者；最后恢复原签名并继续调用。同批拒绝必须保持已有可达调用方及旧对象行为。运行时先追加新类，再执行原子的重定义事务；追加是单向操作，拒绝后新类型可能仍在命名空间。恢复时再次修改该新类并验证修正后的方法体，不声称命名空间回滚或类卸载。
 
-模型属性／初始化由 `properties` 专门用例覆盖，预期见下文；协程挂起／Flow 由 `coroutines` 组按下述契约覆盖；Repository／依赖注入／代理集成仍需专门用例。不声称可为旧对象重跑构造器、恢复任意新捕获值或迁移任意 continuation 状态布局。
+模型属性／初始化由 `properties` 专门用例覆盖，预期见下文；协程挂起／Flow 由 `coroutines` 组按下述契约覆盖；Repository／依赖注入／代理集成由 `repositories` 组覆盖。不声称可为旧对象重跑构造器、恢复任意新捕获值或迁移任意 continuation 状态布局。
 
 开发时运行受影响分组；代码冻结后在两台设备分别运行 `full`，同一设备串行。引擎源码未改时复用已有冻结矩阵并保留版本、产物与来源；新样例 APK 的执行证据单独记录。底层 JNI、安全拒绝、真实调用、CheckJNI 与符号覆盖仍分别验收。历史长停顿和性能越线保持未解决状态，不能由样例功能通过来关闭。
 
@@ -129,3 +130,23 @@ Kotlin 按源码顺序给编译器生成的方法编号。插入 lambda 会改�
 稳定台账记录每个请求、交付、取消、迟到回调、输出、订阅、退订和终结事件。断言检查事件多重集及每个收集器输出顺序；跨收集器的全局调度顺序不作承诺。每步请求 GC、前后台切换并检查输入、ViewModel 与独立 remember 标识。同一进程连续更新，代表性阶段保存真实 continuation 的 ClassFile、DebugMetadata、label 与 spill 字段报告。
 
 追加挂起点用例只覆盖当前挂起点及原 spill 语义保持兼容的编辑。任意插入／删除前置挂起点、重排 label 或改型存活 spill 不是已承诺的迁移能力；不能把这组结果推广到任意状态机重写。开发期使用 `--scenario-group coroutines`；`coroutines-recovery` 可单独定位拒绝后旧任务／新任务与重试，冻结后纳入 `full`；设备结论以本地验证记录为准。
+
+## Repository、依赖注入与动态代理契约
+
+`repositories` 组通过真实页面持有 ViewModel、直接创建的 Repository、独立 Koin 4.1.1 容器、构造注入的客户端、Java Proxy、InvocationHandler 以及已缓存的 Method。输入 `repo42` 写入旧对象，按钮同时调用旧对象和新建对照对象。Kotlin 接口编译为真实 JVM default 方法，经正常 D8 生成设备产物；代表性步骤核对 ClassFile 方法及描述符。
+
+| 编辑 | 已持有对象 | 新对象 |
+| --- | --- | --- |
+| 实现类或接口默认方法体 | 下一次调用新方法体，旧业务数据与引用保留 | 使用最新方法体与构造初值 |
+| 新增抽象方法、default 方法；default 与 abstract 互换 | 直接与 DI 对象按同批接口、实现及调用方分派；代理已有入口继续转发 | 直接与 DI 新对象按同批定义调用 |
+| Proxy 原来没有的接口方法 | 新增 abstract 抛 AME；新增 default 执行接口默认体，绕过 handler | Proxy 缓存复用同一个类，具有相同边界 |
+| 接口参数 String 改 Int | 直接与 DI 对象的类型化调用使用 Int；代理缺少新签名入口时为 AME；已缓存的旧 String Method 明确失败为 NoSuchMethodError，不串到新方法 | 直接与 DI 对象可调用最新签名；复用的代理类仍有上述边界 |
+| 更新 InvocationHandler 方法体 | 原代理和原 handler 下一次执行新逻辑，保留目标对象 | 新代理使用新逻辑，Proxy 类缓存可复用 |
+| 修改 Koin 绑定实现 | 旧容器 singleton 保留；原注入对象与之后创建的 factory 客户端仍引用该 singleton | 新独立容器采用新绑定和新实例 |
+| 更新注入客户端的方法体 | 原客户端立即调用新方法，注入引用保持 | 新客户端使用新方法 |
+| 目标方法抛出异常 | 真实反射转发解包 InvocationTargetException，保留目标异常类型 | 相同异常契约 |
+| 非法活对象改 abstract 导致同批拒绝 | 原接口、实现、代理和 DI 行为保持；无半更新 | 拒绝后新建对象、容器也保持旧定义；修正后整批采用新定义 |
+
+代理处理器将已有代理入口的 Method 真实调用到具体 Repository，包括初始 default 方法；不会伪造返回值。新增 abstract／default 沿用现有 JVM 代理重链接契约，不自动生成新 handler 转发入口；这分别是安全失败和绕过 handler 的默认调用，不能统计为新增代理方法转发成功。旧代理、新代理、缓存的 read Method 均真实调用，签名变化后单独验收退休 Method 的安全失败。Object 的 equals／hashCode／toString 仍采用身份语义。没有给旧容器自动重新绑定或重新注入；本组覆盖 Koin single、factory 与构造注入，不推广为所有 DI／网络代理框架或自动 default 调用机制的兼容承诺。
+
+独立台账精确检查 Repository 构造、客户端构造、业务 read 和 handler 次数，重载、GC、前后台切换不得额外执行这些动作。每次调用比较旧新数据、ViewModel 与 remember 标识、代理类缓存及所有引用锚点。同一进程依次运行 13 个场景，拒绝后直接检查旧新对象，再修正并重试。开发期运行 `--scenario-group repositories`；`repositories-interface` 单独定位新增抽象方法的真实调用与代理边界；冻结后纳入 `full`，设备结论单独记录。

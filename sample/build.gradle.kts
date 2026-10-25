@@ -37,6 +37,7 @@ kotlin {
 dependencies {
     implementation(project(":lib"))
     implementation(libs.coroutines)
+    implementation("io.insert-koin:koin-core:4.1.1")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.material3)
