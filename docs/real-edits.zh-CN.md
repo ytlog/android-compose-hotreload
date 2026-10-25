@@ -2,6 +2,8 @@
 
 本页的用例使用 `sample` 的真实 Compose 页面、ViewModel、输入框、列表选择和一次注册的监听器。编译与更新沿用 Kotlin → ClassFile → 主机 D8 → 设备 JVMTI → Compose invalidation 路径。
 
+常见开发操作的现有覆盖、能力边界和下一步补验标准见[场景覆盖与缺口](coverage-gaps.zh-CN.md)。
+
 ## 使用本地 ART DCEVM
 
 假设两个仓库在同一父目录。在引擎仓库冻结源码后，发布一个独立的开发版本，避免覆盖公开版本：
