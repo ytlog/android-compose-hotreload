@@ -114,10 +114,13 @@ class Cases:
         # HOME animations may keep the Activity STARTED for longer than a fixed delay.
         # Observe the actual collector cancellation without querying a background window.
         expected = self.events['unsubscribe:' + self.model] + 1
+        # Read the session's continuous capture: logcat -d can lose early events when
+        # a small device ring buffer rolls over during a multi-group session.
+        cancelled = re.compile(r'^\S+\s+\S+\s+' + re.escape(self.r.pid) +
+            r'\s+\d+\s+I\s+FrameworkLedger\s*:\s+unsubscribe:' + re.escape(self.model) + r'\s*$', re.MULTILINE)
         def stopped():
-            events = self.d.adb('logcat', '-d', '--pid=' + self.r.pid,
-                                '-v', 'raw', '-s', 'FrameworkLedger:I', '*:S').splitlines()
-            return events.count('unsubscribe:' + self.model) == expected
+            events = (self.r.evidence / 'system.logcat').read_text(errors='replace')
+            return len(cancelled.findall(events)) == expected
         self.r.wait(stopped, 'lifecycle collector cancellation after HOME', timeout=30)
         self.event('unsubscribe')
         self.event('subscribe')
