@@ -45,6 +45,7 @@ python3 tools/real-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN
 | `compose-state` | 按 key 重排组件和区块，插入／重排／删除／新增 LazyColumn 行，修改行标签；拒绝与恢复时检查状态归属 |
 | `compose-recovery` | 单独运行 `compose-state` 的行标签／拒绝／重试三步，以缩小失败范围 |
 | `refactoring` | 修改 Kotlin／Java 参数与返回描述符，追加返回类，跨文件移动辅助方法，重命名 Java 方法；同批拒绝／重试后恢复原签名，持续调用原服务对象 |
+| `properties` | ViewModel／业务属性初始化、getter、新增与改型、委托属性及 data class；比较旧新对象与失败恢复 |
 | `full` | 在同一进程执行所有组，最后返回原页面再次调用原监听器 |
 
 脚本通过真正的 TextField 输入草稿并选择详情；随后检查同一 PID、ViewModel 身份、监听器身份、输入内容、页面选择、业务操作次数及精确的工厂／回调调用次数。初始监听器与引用锚点都是不可变字段；单独创建的对照回调不会替换它们。每步更新后请求 GC，并切换到后台再返回原 Activity；不会用重启或重新安装绕过更新失败。AAR、APK 和引擎的 SHA-256 均记录，安装包哈希及 APK 内动态库必须与本地构件匹配。
@@ -57,7 +58,7 @@ python3 tools/real-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN
 
 签名用例同步重编 Kotlin 调用方与 Java 被调用方，持续调用最初的 Java 服务对象，分别断言结果与真实返回类型。跨文件移动方法会改变 ClassFile 所有者；最后恢复原签名并继续调用。同批拒绝必须保持已有可达调用方及旧对象行为。运行时先追加新类，再执行原子的重定义事务；追加是单向操作，拒绝后新类型可能仍在命名空间。恢复时再次修改该新类并验证修正后的方法体，不声称命名空间回滚或类卸载。
 
-模型属性／初始化、协程挂起／Flow、Repository／依赖注入／代理集成仍需专门用例。当前脚本不覆盖协程和 Flow，也不声称可为旧对象重跑构造器或恢复任意新捕获值。
+模型属性／初始化由 `properties` 专门用例覆盖，预期见下文；协程挂起／Flow、Repository／依赖注入／代理集成仍需专门用例。当前脚本不覆盖协程和 Flow，也不声称可为旧对象重跑构造器或恢复任意新捕获值。
 
 开发时运行受影响分组；代码冻结后在两台设备分别运行 `full`，同一设备串行。引擎源码未改时复用已有冻结矩阵并保留版本、产物与来源；新样例 APK 的执行证据单独记录。底层 JNI、安全拒绝、真实调用、CheckJNI 与符号覆盖仍分别验收。历史长停顿和性能越线保持未解决状态，不能由样例功能通过来关闭。
 
@@ -78,3 +79,30 @@ Kotlin 按源码顺序给编译器生成的方法编号。插入 lambda 会改�
 渲染和签名重构组通过将独立、反射创建并保留的准入守卫改成 abstract 来拒绝批次。守卫有真实活实例，ART 必须拒绝事务；修改它不会改变 Compose 参数 ABI。原有 `recovery` 组另行覆盖将活 ViewModel 改成 abstract。
 
 探索中曾同时修改 ViewModel 修饰符与行标签。Kotlin 增量编译改变了调用方的参数稳定性检查与 intrinsic remember 比较，真实缓存槽布局随之变化；按已有组重置契约，面板／行局部状态被清空，而 ViewModel、草稿、选择、服务和根 remember 状态仍保留。该次运行仍记录为更强状态保留要求的失败，本次没有实现不同 Compose 槽布局之间的迁移。现用独立守卫将事务原子性与这类布局演进分开验收；没有归一化参数入口，也没有关闭编译器优化。
+
+## 模型属性与初始化契约
+
+`properties` 组在真实页面保留 provider 管理的 ViewModel、业务模型、委托对象和 data class；输入 `property42` 后修改旧对象数据。每次通过页面按钮调用最新 getter，并新建对照对象。不可变引用锚点、独立初始化计数器和原页面状态用于识别对象替换与初始化重放。
+
+| 编辑 | 旧对象 | 新对象 |
+| --- | --- | --- |
+| 修改属性初始化表达式、`init` | 同名同类型值保留，不重跑初始化 | 执行最新初始化表达式和 `init` |
+| 修改计算 getter | 下一次调用执行新 getter，读取保留数据 | 执行新 getter，读取新初始化值 |
+| 新增 String／Int／Boolean 属性 | null／0／false；Kotlin 非空声明不补执行初始化，解引用 null 明确为 NPE | 执行声明的初始化表达式 |
+| Int 改 Long | 0L，不作数值转换 | 使用新 Long 初始值 |
+| 实例 Any? 改 CharSequence? | 本用例 StringBuilder 符合现有直接类型兼容规则，保留旧引用值 | 使用新初始化值 |
+| CharSequence? 改 Number? | 不兼容值清为 null | 使用新 Number 初始值 |
+| 修改 lazy 初始化 lambda | 已求值的旧 lazy 保留缓存；未求值的旧 lazy 首次访问执行更新后的方法体；各实例计数各一次 | 首次访问执行新初始化代码 |
+| 修改既有 mutableStateOf 初始值 | 保留旧 delegate 和用户写入值 | 创建带新初值的 delegate |
+| 新增委托属性 | backing delegate 为 null，getter 抛 NPE | 创建 delegate，getter 可调用 |
+| 委托 String 改 Int | MutableState backing 字段 JVM 类型未变，旧 String 留存；getter 抛 CCE | 新 delegate 存储 Int |
+| 应用显式调用委托 setter 迁移 | 设置 Int 后 getter 正常；这一步由页面按钮触发 | 不受影响 |
+| data class 新增主构造参数 | 新字段为 null／0；不重跑主构造器 | 使用新默认参数 |
+| data class 参数 Int 改 Long | 旧值变为 0L | 使用新参数默认值 |
+| 修改 data class 默认参数 | 旧字段值保持 | 无参构造使用新默认值 |
+
+每步检查 data class 的真实 `componentN`、`copy()`／`copy$default`、`equals`、`hashCode`、`toString`。`copy()` 创建新对象，但默认参数取接收者当前字段，而不是声明的新默认值；检查副本不同身份、相同字段及相等／哈希一致，新建默认对象与旧对象不相等。代表性阶段保存并核对真实 ClassFile 描述符，包括委托泛型改型后 backing 字段擦除不变。
+
+缺失 delegate 与类型擦除导致的异常是明确暴露的使用边界，不计作“旧属性可正常使用”，也不通过自动运行构造器修复。旧对象初始化迁移需应用显式定义；本组只演示已存在 delegate 的 setter 迁移，不替新增 delegate 推算历史初值。
+
+非法活对象改 abstract 的批次同时包含待新增属性。拒绝后继续真实调用旧 getter、创建旧定义的新对象并核对计数；修正后在同一进程提交，新属性仅在新对象执行初始化。各步请求 GC、切换前后台并保留输入、引用锚点及独立 remember 标识。开发期执行 `--scenario-group properties`；`properties-lazy` 单独定位已求值／未求值 lazy；冻结后纳入 `full`。结果以本地验证记录与逐次报告为准。
