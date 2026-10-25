@@ -2,10 +2,12 @@ package org.jetbrains.compose.reload.android.gradle
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.instrumentation.FramesComputationMode
 import com.android.build.api.instrumentation.InstrumentationScope
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
 import com.android.build.api.variant.ApplicationVariant
+import com.android.build.api.variant.ScopedArtifacts
 import org.jetbrains.compose.reload.android.gradle.upstream.registerUpstreamReloadTasks
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -13,7 +15,6 @@ import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.TaskProvider
-import org.gradle.api.tasks.compile.JavaCompile
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 /**
@@ -105,17 +106,14 @@ private fun Project.configureVariant(
  */
 private fun Project.hotClasspath(variant: ApplicationVariant): FileCollection {
     val name = variant.name.replaceFirstChar { it.uppercaseChar() }
-    val projectClasses = files(
-        provider {
-            tasks.withType(KotlinJvmCompile::class.java).matching { it.name == "compile${name}Kotlin" }
-                .map { it.destinationDirectory }
-        },
-        provider {
-            tasks.withType(JavaCompile::class.java).matching { it.name == "compile${name}JavaWithJavac" }
-                .map { it.destinationDirectory }
-        },
+    // Direct compiler outputs omit appended classes (e.g. Hilt components) and still have
+    // pre-instrumentation superclasses. Snapshot the same project definitions AGP sends to D8.
+    val inputs = tasks.register("hotProjectClasses$name", AndroidProjectClasses::class.java)
+    variant.artifacts.forScope(ScopedArtifacts.Scope.PROJECT).use(inputs).toGet(
+        ScopedArtifact.CLASSES, AndroidProjectClasses::jars, AndroidProjectClasses::directories
     )
-    projectClasses.builtBy("compile${name}Kotlin", "compile${name}JavaWithJavac")
+    val projectClasses = files(inputs.flatMap { it.jars }, inputs.flatMap { it.directories })
+        .builtBy(inputs)
 
     val projectDependencies = variant.runtimeConfiguration.incoming.artifactView { view ->
         view.componentFilter { it is ProjectComponentIdentifier }

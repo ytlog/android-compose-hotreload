@@ -3,6 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization") version "2.3.21"
+    // Resolve Hilt alongside AGP so both plugins share its compatible JavaPoet dependency.
+    id("com.google.dagger.hilt.android") version "2.57.2" apply false
+    id("com.google.devtools.ksp") version "2.3.9" apply false
     id("io.github.ytlog.compose.hot-reload.android")
 }
 

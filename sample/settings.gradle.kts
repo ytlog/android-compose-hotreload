@@ -50,3 +50,6 @@ dependencyResolutionManagement {
 includeBuild("..")
 
 include(":lib")
+
+// Isolated APK for framework integration; does not add dependencies to the original sample.
+include(":framework")

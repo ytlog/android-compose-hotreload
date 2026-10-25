@@ -30,6 +30,9 @@
 
 以下是尚缺少专项端到端断言的场景，优先级按对日常开发的影响排列，不表示已发现缺陷。
 
+Navigation Compose、Hilt／Room 和输入状态已新增[独立框架夹具与定向 runner](framework-edits.zh-CN.md)。
+设备验收完成前仍保留为覆盖缺口；构建和主机快照回归通过不能替代页面实测。
+
 | 优先级 | 缺口与当前最接近的覆盖 | 最小补验标准 |
 | --- | --- | --- |
 | P1 | Navigation Compose：当前只有手写路由栈 | 使用真实 NavHost／NavController，从列表进入详情并输入数据；修改目的页业务与回调后返回、再次进入；核对 back stack entry、导航作用域 ViewModel、参数、保存状态及 Effect 释放次数 |
