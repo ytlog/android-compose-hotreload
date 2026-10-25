@@ -24,6 +24,9 @@
 | 真实导航页面保留时修改 Activity、业务和旧回调 | `framework/navigation`；NavHost、entry、Hilt ViewModel、参数、rememberSaveable、释放与重新进入 | Navigation 3、进程死亡恢复及任意导航图结构演进另立契约 |
 | 改 Hilt 绑定或 Room 查询生成代码 | `framework/hilt`、`framework/room`；原 Provider、旧注入对象、已持有 DAO、缓存 DAO、Flow 事件及同批拒绝后恢复 | 不自动替换旧注入对象；不覆盖数据库 schema 迁移或所有框架版本 |
 | 中文组合输入、非末尾光标和选区下修改校验逻辑 | `framework/input`；真实 InputMethodService／InputConnection、text、selection、composition、焦点和连接生命周期 | 不等于覆盖厂商拼音候选引擎、语音输入、剪贴板或所有 TextField 实现 |
+| AndroidView 保留原生状态时修改显示与业务逻辑 | `framework/androidview`；Compose 输入驱动 update，实际 View 工厂、容器／子 View 引用、EditText 文本／选区和 tag | 稳定 update 回调内部的辅助方法变化不会自动重放；单列边界，不能计为自动刷新成功。另不覆盖 View 池复用、WebView 或复杂手势 |
+| 修改原生按钮 lambda 和 TextWatcher 匿名监听器 | `framework/native-listener`；View 持有原对象，真实点击／setText 通知、精确次数、释放后不再通知和新对象对照 | 仅修改方法体，匿名捕获布局演进另立契约；setText 不替代键盘输入协议测试 |
+| 系统结果等待返回时修改回调或业务体 | `framework/activity-result`；真实子 Activity、registry 原回调、成功／取消各一次、前后台无重复、退出注销与新注册 | 显式不绑定 LifecycleOwner 的 registry 注册；不外推生命周期结果队列、权限请求、外部相机／文档提供器或进程死亡恢复 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、
@@ -37,7 +40,6 @@
 
 | 优先级 | 缺口与当前最接近的覆盖 | 最小补验标准 |
 | --- | --- | --- |
-| P2 | AndroidView、原生监听器和 Activity Result：现有回调主要由测试页面自己的容器持有 | 由真实 View／系统注册表持有原回调，在未返回的结果或下一次事件前更新方法体；检查原对象调用新逻辑、结果只交付一次、销毁时释放一次，并单独验证新注册对照 |
 | P2 | 绑定方法引用与匿名对象的捕获演进：已有 Java `String::toUpperCase` 和 Retrofit 匿名回调，但没有相应专项演进断言 | 保留 `service::method` 与 `object : Listener`，分别修改目标体、成员签名、捕获布局；检查原接收者数据和引用，区分成功、链接错误与拒绝；不能借用 LambdaMetafactory 捕获映射的结论 |
 | P2 | snapshotFlow、derivedStateOf 及生命周期收集策略的编辑：已有普通 Flow／Effect，框架组还检查 collectAsStateWithLifecycle 的订阅保持与前后台恢复 | 保留原派生状态和订阅，更新计算体后分别变更依赖、切换前后台；检查最新值、订阅数量、取消及恢复行为，按各 API 本身语义断言 |
 | P2 | 长会话与连接故障：已有 20 轮和主机退出测试 | 运行前固定会话时长、编辑次数、停顿与资源增长门槛；记录多个阶段的堆、线程、监听器和任务数量；另测 ADB 中断／恢复与失败提示，不把主机终止后的新进程称为原进程重连 |
@@ -48,6 +50,7 @@
 - 多进程、混淆 variant、动态功能模块，以及新增资源 ID／Manifest 变化不能由当前调试样例外推；现有资源内容更新与安装结构变化要分开。
 - API 33／36 的消费方执行不能代替其他 Android 版本或所有厂商设备验证；引擎符号检查、主机测试、CheckJNI 和真实页面调用各自保留结论。
 - 旧对象补跑初始化、任意 Compose 槽迁移、任意协程状态机重写属于能力边界。增加测试应先确定预期，不默认要求运行时恢复无法推导的历史值。
+- 原生互操作组使用 Navigation ViewModel 持有回调。若改用 `remember` 构造持有者，业务依赖变动可能把构造器标记 dirty 并重置整个页面组；不能用 ViewModel 路径的保留结果掩盖该状态重置边界。
 
 新增用例放在消费方 sample 和 tools，沿用同 PID、旧对象引用、精确副作用计数、GC、
 前后台切换及失败后恢复检查。开发期仅补验受影响组；冻结后按实际影响补齐设备组合，

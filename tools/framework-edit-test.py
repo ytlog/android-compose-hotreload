@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Targeted Navigation Compose, Hilt, Room and IME edits in an isolated sample APK.
+"""Targeted framework, native View/listener and Activity Result edits in a fixed sample APK.
 
 Run --scenario-group all for this new suite only; it does not run the original sample matrix.
 Raw evidence, generated sources and failed runs remain under ignored build/evidence/.
@@ -23,6 +23,7 @@ import zipfile
 from device_session import DeviceSession
 from ime_driver import ImeDriver
 from ui_driver import UiDriver
+from framework_interop import InteropCases, INTEROP_GROUPS
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -30,7 +31,8 @@ MODULE = SAMPLE / 'framework'
 SOURCE = MODULE / 'src/main/java/dev/compose/hotreload/framework'
 APP = 'dev.compose.hotreload.framework'
 ACTIVITY = APP + '/.FrameworkActivity'
-GROUPS = ['navigation', 'hilt', 'room', 'input']
+FRAMEWORK_GROUPS = ['navigation', 'hilt', 'room', 'input']
+GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS
 sha = lambda data: hashlib.sha256(data).hexdigest()
 
 
@@ -501,9 +503,20 @@ def main():
     groups = GROUPS if args.scenario_group == ['all'] else list(dict.fromkeys(args.scenario_group))
     runner=Runner(args)
     try:
-        runner.start();cases=Cases(runner);cases.start()
-        runner.passed('framework-startup')
-        for group in groups:getattr(cases,group)()
+        runner.start()
+        framework_groups = [g for g in groups if g in FRAMEWORK_GROUPS]
+        if framework_groups:
+            cases=Cases(runner);cases.start()
+            runner.passed('framework-startup')
+            for group in framework_groups:getattr(cases,group)()
+        interop_groups = [g for g in groups if g in INTEROP_GROUPS]
+        if interop_groups:
+            if framework_groups:
+                runner.device.tap_text('Back')
+            interop=InteropCases(runner)
+            interop.start()
+            for group in interop_groups:getattr(interop,group.replace('-', '_'))()
+            interop.fresh_and_cleanup(interop_groups)
         runner.session.check()
     except BaseException as error:
         runner.results.append(dict(name=runner.case.name if runner.case!=runner.evidence else 'startup',result='FAIL',error=type(error).__name__))

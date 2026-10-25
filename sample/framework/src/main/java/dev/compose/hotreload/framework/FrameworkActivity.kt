@@ -55,6 +55,8 @@ fun FrameworkScreen() {
                     Text("Draft list")
                     Button(onClick = { nav.navigate("detail/42") }) { Text("Open 42") }
                     Button(onClick = { nav.navigate("detail/43") }) { Text("Open 43") }
+                    Button(onClick = { nav.navigate("interop") }) { Text("Open interop") }
+                    Text("Interop audit: ${interopAuditSummary()}", fontSize = 10.sp)
                 }
             }
             composable("detail/{id}", arguments = listOf(navArgument("id") { type = NavType.IntType })) { entry ->
@@ -62,6 +64,7 @@ fun FrameworkScreen() {
                 FrameworkForm(model, entry.id) { nav.navigate("review") }
             }
             composable("review") { Text("Review page") }
+            composable("interop") { InteropScreen() }
         }
         Text("Ledger: ${FrameworkLedger.events.joinToString(";")}", fontSize = 8.sp, maxLines = 2)
     }

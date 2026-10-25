@@ -1,4 +1,4 @@
-# Navigation、Hilt、Room 与输入状态的定向验证
+# Android 框架与页面状态的定向验证
 
 `sample/framework` 是独立应用模块，应用 ID 为 `dev.compose.hotreload.framework`。
 该模块仅在 `-Pcompose.reload.frameworkFixture=true` 时加入构建，两个专用 runner 自动传入该参数。
@@ -15,12 +15,22 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页新增的四组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room` 或 `input` 单组定位，也可以用
+这里的 `all` **只运行本页的七组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener` 或 `activity-result` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
 本地 upstream Maven 产物；每台设备内部仍串行执行。
+
+只验收原生互操作的新增场景时使用：
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN \
+  --art-dcevm-version VERSION --scenario-group androidview native-listener activity-result
+```
+
+这三组直接进入互操作页，不执行详情页的 Hilt／Room／IME 场景，也不切换设备输入法。
+它们仍使用同一个固定应用 ID 和原 UI 辅助包。
 
 Hilt／KSP 插件在 sample 根构建仅声明 `apply false`，避免父子插件类加载器选择不同的
 JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `ScopedArtifact.CLASSES`
@@ -41,12 +51,32 @@ JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `Scoped
 | room | SQL 变化与活对象改 abstract 同批提交；撤回非法改动再试 | Native 准入拒绝后旧 SQL、旧回调和页面保持；同进程修正后新 SQL 生效；不重新安装或重启来恢复 |
 | input | 中文组合输入及中间光标下更新校验体 | 通过系统 InputMethodService 的 InputConnection 操作，保留 text、selection、composition、焦点及输入连接生命周期 |
 | input | 提交组合文本，在选区存在时更新，再继续输入 | 选区保持；后续中文输入只替换选区，提交结束 composition，回调读取新草稿；不能用程序设置应用状态替代输入法链路 |
+| androidview | 修改 Compose 计算后传给 `AndroidView.update` 的标签及原生按钮调用的业务方法 | factory 只执行一次；同 PID、页面状态对象、原生容器／子 View 与 tag，EditText 原文本和选区保持；下一次实际按钮点击执行新业务逻辑 |
+| androidview 边界 | 仅修改稳定 `update` 回调内调用的辅助方法，不改变 Compose 输入 | 热替换成功不意味着命令式 update 自动重放；已有原生属性仍是旧值。随后改变标签输入触发 update，才观察到该辅助方法的新值；此项单列边界，不计为自动刷新成功 |
+| native-listener | 修改原 `OnClickListener` lambda 和匿名 `TextWatcher.afterTextChanged` 方法体 | 监听器只在 factory 创建时安装；真实按钮点击及原 EditText 的 `setText` 通知调用原监听器的新逻辑，各一次；重载本身不触发通知 |
+| activity-result | 子 Activity 尚未返回时修改原 registry 回调与业务方法，分别返回成功及取消 | 真实 `startActivityForResult`／`setResult` 链路；原有子 Activity token 不变，父页面原对象不变；成功与取消各交付一次，GC／前后台切换不重复交付 |
+| 原生互操作共同检查 | 弹出页面后重新进入，再次操作并弹出 | 每次 entry 创建一个 View 和 registry 注册；每次退出释放／注销一次；移除监听器后对已释放 View 再发事件不会调用旧回调；新 entry 的新 View／新注册执行更新后的逻辑 |
 
-每次正常编辑后请求 GC、切换前后台，并检查精确的订阅／退订与行值事件。
+详情页每次正常编辑后请求 GC、切换前后台，并检查精确的订阅／退订与行值事件。
 退到桌面后读取会话持续采集的当前进程夹具事件日志，确认 Flow 实际取消订阅再恢复页面，
 避免用固定延时假定退出动画已结束，也避免设备环形日志覆盖早期事件后误判退订数量。
 输入组在组合区间和选区断言完成之前不切后台，因为失焦本身可以合法结束组合输入；
 完成输入后再验证 GC 和前后台切换。安装 APK、Maven Local AAR 及内部引擎哈希必须匹配。
+
+原生互操作页在每次编辑与事件后核对工厂／释放、注册／注销、子 Activity 创建／销毁及
+回调计数，并读取原生 EditText 的真实文本与选区。Activity Result 使用显式
+`ActivityResultRegistry.register`（不绑定 LifecycleOwner），由 `DisposableEffect` 管理注销；
+它验证注册表持有原回调的行为，不用 `dispatchResult` 模拟系统返回，也不代表所有
+`rememberLauncherForActivityResult`、生命周期暂停期间待交付结果或进程死亡恢复策略均已覆盖。
+TextWatcher 的通知由对真实 EditText 的 `setText` 触发；键盘输入协议仍由独立 `input` 组验收。
+runner 对已确认的 update 重放边界写入单独的 `boundary` 字段；不能把该契约检查的
+PASS 描述为原生 UI 自动刷新已支持。原始失败和后续边界验证均保留在本地证据中。
+
+原对象由 Navigation 的 ViewModelStore 持有。探索中使用 `remember { InteropState() }`
+创建回调持有者时，修改原生回调依赖的业务方法使构造器被判为 dirty，日志明确记录
+`cache evaluates dirty method`，整个所属 Compose group 被重置，View 和注册随之重建。
+因此本组的保留结论限定于 ViewModel 持有者，不能外推到这种 remember 初始化依赖变化。
+这项更强保留要求的失败仍保留；没有修改公共 invalidation 策略来绕过它。
 
 ## 输入法与设备准备
 
@@ -72,5 +102,5 @@ JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `Scoped
 每次新增用例后的默认动作。
 
 本组不修改数据库 schema，不自动重建旧 DI 对象，不迁移任意 Compose 槽或任意协程
-状态机。Navigation 3、AndroidView／Activity Result、任意匿名捕获演进和长时间连接故障
+状态机。Navigation 3、原生 View 池复用／复杂手势、生命周期绑定结果队列、任意匿名捕获演进和长时间连接故障
 仍需各自专项用例，不能因本组通过而划为完成。
