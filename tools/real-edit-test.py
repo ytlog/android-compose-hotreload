@@ -2,7 +2,7 @@
 """Continuous Kotlin -> D8 -> live Compose edits, restoring sources on exit.
 
 python3 tools/real-edit-test.py --serial DEVICE --device-id local-apiNN \
-    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|coroutines|coroutines-recovery|repositories|repositories-interface|full]
+    --art-dcevm-version VERSION [--scenario-group startup|business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|coroutines|coroutines-recovery|repositories|repositories-interface|full]
 Raw output stays in ignored build/evidence/. No reinstall or restart between edits.
 """
 import argparse
@@ -19,6 +19,7 @@ import subprocess
 import time
 import zipfile
 from types import SimpleNamespace
+from device_session import DeviceSession
 from development_scenarios import DevelopmentCases, DEVELOPMENT_SOURCES, GENERATED_SOURCES
 from property_scenarios import PropertyCases, PROPERTY_SOURCES
 from coroutine_scenarios import CoroutineCases, COROUTINE_SOURCES
@@ -44,7 +45,7 @@ def main():
     parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--art-dcevm-version', required=True)
-    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'full'], default='full')
+    parser.add_argument('--scenario-group', choices=['startup', 'business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'full'], default='full')
     args = parser.parse_args()
     if not args.serial:
         parser.error('Set --serial or ANDROID_SERIAL')
@@ -232,10 +233,12 @@ def main():
                               case_dir=lambda: case_dir, results=results, app_pid=lambda: app_pid,
                               value=value, edit=regression.edit)
     development = None
+    session = DeviceSession(device, evidence, APP)
     run_log = (evidence / 'hotRun.log').open('w')
     try:
         device.adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')
         device.adb('shell', 'wm', 'dismiss-keyguard')
+        session.start()
         with (evidence / 'prepare-probe.log').open('w') as log:
             subprocess.run([str(ROOT / 'gradlew'), ':hot-reload-android-host:prepareWorkflowProbe', '--console=plain'],
                            cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
@@ -255,6 +258,7 @@ def main():
                                  stdout=probe_log, stderr=subprocess.STDOUT, text=True)
         wait(lambda: 'PROBE_READY' in orchestration.read_text(), 'orchestration observer')
         app_pid = device.adb('shell', 'pidof', APP).strip()
+        session.bind_process(app_pid)
         # The runtime connects before Application/launcher onCreate completes. Wait for its first UI
         # before launching another Activity, otherwise the pending launcher can cover the test page.
         device.wait_for(lambda ts: 'Count: 0' in ts, 'launcher ready', timeout=60)
@@ -312,6 +316,8 @@ def main():
             model_id, remember_id, listener_id = (value(texts, p) for p in ['Model: ', 'Remember: ', 'Listener: '])
             invariant()
         group = args.scenario_group
+        if group == 'startup':
+            results.append({'name': 'startup-input-and-callback', 'result': 'PASS'})
         if group in ['business', 'full']:
             accepted('business-body', [(LOGIC, '"business-v1:${input.trim()}"', '"business-v2:${input.uppercase()}"')],
                      action=lambda: apply('business-v2:DRAFT42'))
@@ -478,6 +484,7 @@ def main():
                 callbacks(expected['callback'], expected['control'])
                 common()
                 results.append({'name': 'return-to-original-page', 'result': 'PASS'})
+        session.check()
     except BaseException as failure:
         results.append({'name': case_dir.name if case_dir != evidence else 'startup',
                         'result': 'FAIL', 'error': type(failure).__name__})
@@ -485,6 +492,11 @@ def main():
         print('FAIL: ' + results[-1]['name'] + '; inspect ignored evidence', flush=True)
         raise
     finally:
+        try:
+            session.close()
+        except Exception as error:
+            results.append({'name': 'session-cleanup', 'result': 'FAIL', 'error': type(error).__name__})
+            (evidence / 'session-cleanup-failure.txt').write_text(str(error))
         if app_pid:
             try:
                 (evidence / 'logcat.txt').write_text(device.logcat())
