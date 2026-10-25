@@ -21,26 +21,25 @@
 | 返回页面、Activity 重建、主题配置变化 | `lifecycle`；显式路由、BackHandler、SavedStateHandle 与 rememberSaveable | 这不是 Navigation Compose 库内部状态验证，也不是进程死亡恢复 |
 | 编译失败、批次拒绝、初始化异常后继续编辑 | `recovery`、`transaction`、workflow runner | 准入拒绝与提交后异常分开；新类命名空间及外部副作用不承诺回滚 |
 | 跨模块修改、快速保存和连续更新 | `refactoring`、`build`、`session`、workflow runner | 固定 20 次更新与十次快速保存不能证明全天稳定或不存在泄漏 |
+| 真实导航页面保留时修改 Activity、业务和旧回调 | `framework/navigation`；NavHost、entry、Hilt ViewModel、参数、rememberSaveable、释放与重新进入 | Navigation 3、进程死亡恢复及任意导航图结构演进另立契约 |
+| 改 Hilt 绑定或 Room 查询生成代码 | `framework/hilt`、`framework/room`；原 Provider、旧注入对象、已持有 DAO、缓存 DAO、Flow 事件及同批拒绝后恢复 | 不自动替换旧注入对象；不覆盖数据库 schema 迁移或所有框架版本 |
+| 中文组合输入、非末尾光标和选区下修改校验逻辑 | `framework/input`；真实 InputMethodService／InputConnection、text、selection、composition、焦点和连接生命周期 | 不等于覆盖厂商拼音候选引擎、语音输入、剪贴板或所有 TextField 实现 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
-完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py` 和
-`workflow-test.py`；不能把 real-edit 的 `full` 当作四个 runner 都已执行。
+完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、
+`workflow-test.py` 和新增的 `framework-edit-test.py`；不能把一个 runner 的 `full`／`all`
+当作其他 runner 都已执行。框架组的入口、固定依赖版本和断言契约见
+[独立框架夹具与定向 runner](framework-edits.zh-CN.md)。设备通过范围仍以本地验证记录为准。
 
 ## 建议补验顺序
 
 以下是尚缺少专项端到端断言的场景，优先级按对日常开发的影响排列，不表示已发现缺陷。
 
-Navigation Compose、Hilt／Room 和输入状态已新增[独立框架夹具与定向 runner](framework-edits.zh-CN.md)。
-设备验收完成前仍保留为覆盖缺口；构建和主机快照回归通过不能替代页面实测。
-
 | 优先级 | 缺口与当前最接近的覆盖 | 最小补验标准 |
 | --- | --- | --- |
-| P1 | Navigation Compose：当前只有手写路由栈 | 使用真实 NavHost／NavController，从列表进入详情并输入数据；修改目的页业务与回调后返回、再次进入；核对 back stack entry、导航作用域 ViewModel、参数、保存状态及 Effect 释放次数 |
-| P1 | Hilt／Dagger 与 Room：Koin 和 serialization 不能代表这些生成代码 | 保留注入的 Repository、DAO、数据库和 Flow 收集器；先改实现体，再改绑定或 DAO 查询；核对增量生成产物、真实查询结果、订阅次数及旧新依赖图。数据库 schema 迁移另立契约，不隐含由热更新完成 |
-| P1 | 编辑中的文本状态：当前只断言字符串草稿保留 | 在真实 IME 组合输入、非末尾光标和选择区间下修改校验／格式化 lambda；核对文本、selection、composition、焦点及后续输入，不只核对最终字符串 |
 | P2 | AndroidView、原生监听器和 Activity Result：现有回调主要由测试页面自己的容器持有 | 由真实 View／系统注册表持有原回调，在未返回的结果或下一次事件前更新方法体；检查原对象调用新逻辑、结果只交付一次、销毁时释放一次，并单独验证新注册对照 |
 | P2 | 绑定方法引用与匿名对象的捕获演进：已有 Java `String::toUpperCase` 和 Retrofit 匿名回调，但没有相应专项演进断言 | 保留 `service::method` 与 `object : Listener`，分别修改目标体、成员签名、捕获布局；检查原接收者数据和引用，区分成功、链接错误与拒绝；不能借用 LambdaMetafactory 捕获映射的结论 |
-| P2 | snapshotFlow、derivedStateOf、collectAsStateWithLifecycle：已有普通 Flow／Effect 覆盖 | 保留原派生状态和订阅，更新计算体后分别变更依赖、切换前后台；检查最新值、订阅数量、取消及恢复行为，按各 API 本身语义断言 |
+| P2 | snapshotFlow、derivedStateOf 及生命周期收集策略的编辑：已有普通 Flow／Effect，框架组还检查 collectAsStateWithLifecycle 的订阅保持与前后台恢复 | 保留原派生状态和订阅，更新计算体后分别变更依赖、切换前后台；检查最新值、订阅数量、取消及恢复行为，按各 API 本身语义断言 |
 | P2 | 长会话与连接故障：已有 20 轮和主机退出测试 | 运行前固定会话时长、编辑次数、停顿与资源增长门槛；记录多个阶段的堆、线程、监听器和任务数量；另测 ADB 中断／恢复与失败提示，不把主机终止后的新进程称为原进程重连 |
 
 ## 需要独立契约的范围
