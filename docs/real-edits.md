@@ -31,6 +31,8 @@ For manual use, run `./sample/gradlew -p sample hotRunDebug`, then open the page
 | `compose-state` | Reorder keyed components and sections; insert, reorder, remove and add lazy-list items; edit a row label; reject and recover a batch while preserving state |
 | `compose-recovery` | Run only the row-label/rejection/retry tail of `compose-state` to localize failures |
 | `refactoring` | Change Kotlin/Java parameters and return descriptors, append a result class, move a helper between files, rename a Java method, reject/retry a mixed batch and restore original signatures on the retained service |
+| `coroutines` | Suspended and fresh tasks, exact request/callback counts, Flow collectors, cancellation, exceptions and atomic recovery |
+| `coroutines-recovery` | Isolate rejected-update old/fresh tasks and successful retry |
 | `properties` | Retained/new model initialization, getters, added/retyped properties, delegates, data classes and rejection/retry |
 | `full` | Execute all groups consecutively in one process, then return to the original page and call its retained listeners |
 
@@ -44,7 +46,7 @@ The state page retains an input draft, selected item, ViewModel, service instanc
 
 Signature cases invoke the same Java service instance after synchronously recompiling Kotlin callers and Java callees. They check both the text and the actual returned class. Moving a helper changes its ClassFile owner; restoring the initial signatures proves continued calls without reinstalling. A rejected batch must preserve existing reachable callers and retained-object behavior. Runtime class addition is append-only and precedes the atomic redefine transaction: a newly appended type can remain after rejection. The recovery edits that type again and checks its corrected body, rather than claiming namespace rollback or class unloading.
 
-Model initialization is covered by the dedicated properties group and contract below; suspended coroutines/Flow and Repository/DI/proxy integration still need dedicated coverage. Coroutines and Flow are not covered yet. Run affected groups during development and `full` on both devices after freezing, serially on each device. Keep unchanged engine matrix evidence with its original provenance, separate from the new sample APK runs. Functional success does not resolve historical performance or long-pause failures.
+Model initialization is covered by the dedicated properties group and contract below; suspended coroutines/Flow are covered by the coroutines contract below. Repository/DI/proxy integration still needs dedicated coverage. Run affected groups during development and `full` on both devices after freezing, serially on each device. Keep unchanged engine matrix evidence with its original provenance, separate from the new sample APK runs. Functional success does not resolve historical performance or long-pause failures.
 
 ## Retained lambda contract
 
@@ -76,3 +78,13 @@ The `properties` group retains a provider-owned ViewModel, business model, deleg
 - A live independent admission guard rejects a batch containing pending model properties. Old calls and construction remain valid; correcting the guard commits the pending edit in the same process. Every step requests GC and backgrounds/resumes the page. Input, reference anchors and an independent remember token remain checked.
 
 Missing or generically incompatible delegates are recorded usability boundaries, not successful normal property reads. Application initialization migration must be explicit; this group demonstrates setter migration for an existing delegate, not reconstruction of missing delegate initializers. Representative ClassFiles are saved and checked for real descriptor changes and delegate erasure. Run `--scenario-group properties` during development and `full` after freezing. Execution outcomes are recorded separately in local verification records.
+
+## Suspended tasks and Flow
+
+The `coroutines` group uses a retained provider-owned ViewModel, a SupervisorJob, real kotlinx.coroutines, and UI-driven external completions through `suspendCancellableCoroutine`. Reload does not start or restart work. It verifies callback-based request processing, not HTTP transport retries.
+
+Suspended tasks retain pre-suspension values and resume through updated compatible code; fresh tasks use current initialization and bodies. Named suspend methods, suspend lambdas and nested calls are checked separately. Appending a suspension after the current compatible label must execute each request once. Cancellation runs cleanup and completion once; late callbacks are ignored. Exceptions produce one error completion and do not prevent the supervisor's next task.
+
+Cold Flow factories retain their old captures while updated builder bodies execute. Active and fresh collectors must receive each applicable event once through updated map/collect bodies without resubscribing. Suspended map operations, cancellation/recollection, and StateFlow equality conflation are checked explicitly. Atomic refusal preserves the old pending request/collector behavior; corrected updates can proceed.
+
+An unedited ledger checks all requests, deliveries, cancellations, late callbacks, outputs, subscriptions, unsubscriptions and terminal notifications, including output order per collector. Every stage requests GC and backgrounds/resumes the same page, preserving input and identity anchors. Real compiler continuation ClassFiles/DebugMetadata are retained as evidence. Arbitrary label renumbering or incompatible live spill changes are outside the compatible-state contract; appending a suspension does not establish general state-machine migration. See the [detailed contract](real-edits.zh-CN.md#suspend协程与-flow-契约). Run `--scenario-group coroutines` during development; `full` includes it after freeze.

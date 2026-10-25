@@ -2,7 +2,7 @@
 """Continuous Kotlin -> D8 -> live Compose edits, restoring sources on exit.
 
 python3 tools/real-edit-test.py --serial DEVICE --device-id local-apiNN \
-    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|full]
+    --art-dcevm-version VERSION [--scenario-group business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|coroutines|coroutines-recovery|full]
 Raw output stays in ignored build/evidence/. No reinstall or restart between edits.
 """
 import argparse
@@ -21,6 +21,7 @@ import zipfile
 from types import SimpleNamespace
 from development_scenarios import DevelopmentCases, DEVELOPMENT_SOURCES, GENERATED_SOURCES
 from property_scenarios import PropertyCases, PROPERTY_SOURCES
+from coroutine_scenarios import CoroutineCases, COROUTINE_SOURCES
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -42,7 +43,7 @@ def main():
     parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--art-dcevm-version', required=True)
-    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'full'], default='full')
+    parser.add_argument('--scenario-group', choices=['business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'full'], default='full')
     args = parser.parse_args()
     if not args.serial:
         parser.error('Set --serial or ANDROID_SERIAL')
@@ -60,7 +61,7 @@ def main():
     evidence = ROOT / 'build/evidence' / f'real-edits-{args.device_id}-{time.time_ns()}'
     evidence.mkdir(parents=True)
     print('Evidence: ' + str(evidence.relative_to(ROOT)), flush=True)
-    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, *PROPERTY_SOURCES, ADDED, *GENERATED_SOURCES]
+    paths = [LOGIC, SCREEN, MODEL, *DEVELOPMENT_SOURCES, *PROPERTY_SOURCES, *COROUTINE_SOURCES, ADDED, *GENERATED_SOURCES]
     originals = {path: path.read_bytes() if path.exists() else None for path in paths}
     results = []
     metadata = {'device': args.device_id, 'engineVersion': args.art_dcevm_version,
@@ -220,7 +221,9 @@ def main():
     state_activity = APP + '/.StateEditActivity'
     property_only = args.scenario_group in ['properties', 'properties-lazy']
     property_activity = APP + '/.PropertyEditActivity'
-    current_activity = property_activity if property_only else state_activity if development_only else ACTIVITY
+    coroutine_only = args.scenario_group in ['coroutines', 'coroutines-recovery']
+    coroutine_activity = APP + '/.CoroutineEditActivity'
+    current_activity = coroutine_activity if coroutine_only else property_activity if property_only else state_activity if development_only else ACTIVITY
     context = SimpleNamespace(device=device, evidence=evidence, source=SOURCE, snapshot=snapshot,
                               accepted=accepted, trigger=trigger, common=common, new_case=new_case,
                               case_dir=lambda: case_dir, results=results, app_pid=lambda: app_pid,
@@ -253,7 +256,7 @@ def main():
         # before launching another Activity, otherwise the pending launcher can cover the test page.
         device.wait_for(lambda ts: 'Count: 0' in ts, 'launcher ready', timeout=60)
         device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
-        device.wait_for(lambda ts: ('Property edits' if property_only else 'Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
+        device.wait_for(lambda ts: ('Coroutine edits' if coroutine_only else 'Property edits' if property_only else 'Development edits' if development_only else 'Real edits v1') in ts, 'edit page', timeout=60)
         apk_dir = SAMPLE / 'build/outputs/apk/debug'
         apk_info = json.loads((apk_dir / 'output-metadata.json').read_text())
         assert len(apk_info['elements']) == 1, 'Expected a single arm64 APK'
@@ -274,7 +277,11 @@ def main():
                         abi=device.adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
                         checkJni=device.adb('shell', 'getprop', 'debug.checkjni').strip())
         (evidence / 'startup.logcat').write_text(device.logcat())
-        if property_only:
+        if coroutine_only:
+            coroutines = CoroutineCases(context)
+            active_invariant = coroutines.invariant
+            coroutines.start()
+        elif property_only:
             properties = PropertyCases(context)
             active_invariant = properties.invariant
             properties.start()
@@ -417,6 +424,18 @@ def main():
                 properties.run_lazy()
             else:
                 properties.run()
+        if group in ['coroutines', 'coroutines-recovery', 'full']:
+            if not coroutine_only:
+                current_activity = coroutine_activity
+                device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
+                device.wait_for(lambda ts: 'Coroutine edits' in ts, 'coroutine page')
+                coroutines = CoroutineCases(context)
+                active_invariant = coroutines.invariant
+                coroutines.start()
+            if group == 'coroutines-recovery':
+                coroutines.run_recovery()
+            else:
+                coroutines.run()
         if group in ['compose-state', 'compose-recovery', 'refactoring', 'full']:
             if development is None:
                 current_activity = state_activity
