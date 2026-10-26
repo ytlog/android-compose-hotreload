@@ -20,7 +20,7 @@
 - **使用上游开发工具**：通过 devtools 查看重载结果、处理 composition 异常、重置 UI 状态。
 - **查看失败原因并重试**：ART 原生拒绝原因回传到 devtools；失败的源码变更保留，撤回不支持的改动或补齐实现后可继续重载。
 
-在初始化逻辑与 Compose 槽布局保持兼容时，受支持的业务逻辑和已有回调修改会保留普通 `remember` 状态。已验证原 AndroidView、snapshotFlow / derivedStateOf 和生命周期收集的相关编辑，不需要把状态移到 ViewModel。具体改动与条件见[真实页面验证](docs/real-edits.zh-CN.md)和[框架用例](docs/framework-edits.zh-CN.md)。
+状态保留取决于改动和上游的 Compose scope 分析。例如，文件总行数变化可能使使用 `remember` 的 composable 被判定为需要重置，详见 [状态重置说明](docs/android.zh-CN.md#状态重置上游行为)。
 
 ## 接入已有工程
 
@@ -97,7 +97,7 @@ plugins {
 | Android SDK | Platform 37；应用的 `compileSdk` 至少为 37 |
 | Native 构建工具（构建设备 runtime） | NDK `27.2.12479018`、CMake `3.22.1`，用于编译本项目的 JVMTI 代理 |
 | Gradle / AGP / Kotlin | Gradle `8.14.4`、AGP `8.11.1`、Kotlin `2.3.21` |
-| ART 重定义引擎 | `io.github.ytlog:artdcevm:0.1.0-alpha.4` |
+| ART 重定义引擎 | `io.github.ytlog:artdcevm:0.1.0-alpha.3` |
 
 art-dcevm 及其依赖要求 `compileSdk 37`。使用 AGP `8.11.1` 时，可在应用工程的 `gradle.properties` 中加入 `android.suppressUnsupportedCompileSdk=37`，配合当前配置构建。
 
@@ -111,7 +111,7 @@ art-dcevm 及其依赖要求 `compileSdk 37`。使用 AGP `8.11.1` 时，可在�
 - 尚未支持多进程应用与 minified variants。
 - devtools 的桌面窗口功能尚未接入 Android，包括截图、语义树、UI 操作和窗口尺寸控制。
 - 尚未接入 IDE 插件的 Android 运行配置，以及 `ReloadEffects`、`AfterHotReloadEffect` / `invokeAfterHotReload` 钩子。
-- 修改 `remember` 初始化逻辑或 Compose 槽布局可能重置受影响的组；缺少分析元数据或 Compose 刷新 API 不可用时也可能回退到重置。受支持的延后回调修改会保留其所属状态，但不保证任意槽迁移或挂起协程状态迁移。`derivedStateOf` 在依赖变化使缓存失效后执行新计算，单纯重载代码不会强制使该缓存失效。
+- `remember` 状态可能随 Compose scope 变化而重置；热重载不保证所有改动都保留状态。
 
 更多平台差异和限制见 [Android 说明](docs/android.zh-CN.md#尚未支持)。
 
