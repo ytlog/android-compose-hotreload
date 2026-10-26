@@ -23,7 +23,13 @@ dependencyResolutionManagement {
             }
         }
         exclusiveContent {
-            forRepository { maven(file("upstream/compose-hot-reload/build/repo")) }
+            forRepository {
+                if (providers.gradleProperty("useLocalUpstream").orNull == "true") {
+                    maven(file("upstream/compose-hot-reload/build/repo"))
+                } else {
+                    maven("https://packages.jetbrains.team/maven/p/firework/dev")
+                }
+            }
             filter { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
         }
         google()

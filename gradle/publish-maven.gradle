@@ -1,0 +1,52 @@
+// Shared release contract for the plugin marker, plugin implementation, host, protocol and AAR.
+mavenPublishing {
+    coordinates(project.group.toString(), project.name, project.version.toString())
+    pom {
+        name = "Android Compose Hot Reload: ${project.name}"
+        description = 'Gradle integration, host and Android runtime for Jetpack Compose hot reload.'
+        inceptionYear = '2026'
+        url = 'https://github.com/ytlog/android-compose-hotreload'
+        licenses {
+            license {
+                name = 'The Apache License, Version 2.0'
+                url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                distribution = 'repo'
+            }
+        }
+        developers {
+            developer {
+                id = 'ytlog'
+                name = 'ytlog'
+                url = 'https://github.com/ytlog'
+            }
+        }
+        scm {
+            url = 'https://github.com/ytlog/android-compose-hotreload'
+            connection = 'scm:git:https://github.com/ytlog/android-compose-hotreload.git'
+            developerConnection = 'scm:git:ssh://git@github.com/ytlog/android-compose-hotreload.git'
+        }
+    }
+    if (providers.gradleProperty('enableMavenCentral').orElse('false').get().toBoolean()) {
+        publishToMavenCentral(true, true)
+        signAllPublications()
+    }
+}
+
+// Repository staging exercises the same publications before any upload.
+publishing {
+    repositories {
+        maven {
+            name = 'staging'
+            url = rootProject.layout.buildDirectory.dir('staging-repository')
+        }
+    }
+}
+
+tasks.withType(org.gradle.api.publish.maven.tasks.AbstractPublishToMaven).configureEach {
+    doFirst {
+        if (providers.gradleProperty('artDcevmVersion').isPresent() ||
+            providers.gradleProperty('useLocalUpstream').orElse('false').get().toBoolean()) {
+            throw new GradleException('Publish only with the pinned public engine and upstream dependencies.')
+        }
+    }
+}

@@ -4,7 +4,9 @@ pluginManagement {
     /* Compose Hot Reload for Android (plugin, runtime and host) */
     includeBuild("..")
     repositories {
-        maven(file("../upstream/compose-hot-reload/build/repo")) {
+        maven(if (providers.gradleProperty("useLocalUpstream").orNull == "true")
+            uri("../upstream/compose-hot-reload/build/repo")
+        else uri("https://packages.jetbrains.team/maven/p/firework/dev")) {
             mavenContent { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
         }
         google {
@@ -33,7 +35,9 @@ dependencyResolutionManagement {
                 filter { includeModule("io.github.ytlog", "artdcevm") }
             }
         }
-        maven(file("../upstream/compose-hot-reload/build/repo")) {
+        maven(if (providers.gradleProperty("useLocalUpstream").orNull == "true")
+            uri("../upstream/compose-hot-reload/build/repo")
+        else uri("https://packages.jetbrains.team/maven/p/firework/dev")) {
             mavenContent { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
         }
         google {

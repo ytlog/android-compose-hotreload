@@ -1,6 +1,7 @@
 import java.util.Properties
 
 plugins {
+    id("com.vanniktech.maven.publish") version "0.35.0" apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.android) apply false
@@ -23,6 +24,8 @@ check(upstreamLock.getProperty("version") == upstreamVersion &&
 subprojects {
     group = "io.github.ytlog.compose.hot-reload"
     version = rootProject.version
+    apply(plugin = "com.vanniktech.maven.publish")
+    apply(from = rootProject.file("gradle/publish-maven.gradle"))
 }
 
 val upstreamModules = listOf(
@@ -69,7 +72,9 @@ val verifyUpstream = tasks.register("verifyUpstream") {
 }
 
 subprojects {
-    tasks.matching { it.name.startsWith("compile") }.configureEach { dependsOn(verifyUpstream) }
+    if (providers.gradleProperty("useLocalUpstream").orNull == "true") {
+        tasks.matching { it.name.startsWith("compile") }.configureEach { dependsOn(verifyUpstream) }
+    }
 }
 
 tasks.register("androidCheck") {

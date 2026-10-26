@@ -24,32 +24,32 @@
 
 ## 接入已有工程
 
-适用于已有的 Android application + Jetpack Compose 工程。以下为当前可用的源码接入方式，通过 Gradle composite build 引入本仓库；本地 Maven 目录用于解析源码构建的固定上游依赖。首次使用请先完成文末的 [源码准备](#1-准备源码与构件)。
+适用于已有的 Android application + Jetpack Compose 工程。Android 插件、host 和 runtime 的 `0.1.0-alpha.2` 版本发布到 Maven Central，固定的 JetBrains 上游构件从其官方公共 `firework` 仓库解析。接入无需克隆源码、配置 `includeBuild`、使用 Maven Local 或执行 `prepareUpstream`。
 
-以下假设本仓库与应用工程位于同一父目录，路径按实际位置调整。配置片段请合并到应用现有配置中。
+将以下片段合并到应用现有配置中。插件解析和应用依赖解析都需要添加公共上游仓库，并按示例将其限定到上游依赖组。
 
 ### 1. 配置应用工程的 settings.gradle.kts
 
 ```kotlin
 pluginManagement {
-    includeBuild("../android-compose-hotreload")
     repositories {
-        maven(file("../android-compose-hotreload/upstream/compose-hot-reload/build/repo"))
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven("https://packages.jetbrains.team/maven/p/firework/dev") {
+            content { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
+        }
     }
 }
-
 dependencyResolutionManagement {
     repositories {
-        maven(file("../android-compose-hotreload/upstream/compose-hot-reload/build/repo"))
         google()
         mavenCentral()
+        maven("https://packages.jetbrains.team/maven/p/firework/dev") {
+            content { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
+        }
     }
 }
-
-includeBuild("../android-compose-hotreload")
 ```
 
 ### 2. 在应用模块应用插件
@@ -59,7 +59,7 @@ includeBuild("../android-compose-hotreload")
 ```kotlin
 plugins {
     // 保留已有的 Android、Kotlin Android 和 Compose compiler 插件
-    id("io.github.ytlog.compose.hot-reload.android")
+    id("io.github.ytlog.compose.hot-reload.android") version "0.1.0-alpha.2"
 }
 ```
 
@@ -128,10 +128,10 @@ cd android-compose-hotreload
 # 替换为本机 Android SDK 的实际路径
 export ANDROID_HOME="/path/to/Android/sdk"
 
-./gradlew prepareUpstream
+./gradlew androidCheck
 ```
 
-这一步构建固定版本的 JetBrains JVM 构件，并发布到 `upstream/compose-hot-reload/build/repo`。首次接入前执行一次，更新上游源码后重新执行；Android 插件、host 和 runtime 由应用的 composite build 自动构建。
+这一步使用固定的公共依赖验证 Android 模块。仓库示例保留 composite build，供开发本插件使用。只有修改仓库内的上游源码时，才需要运行 `./gradlew prepareUpstream`，并通过 `-PuseLocalUpstream=true` 选择本地构件；使用已发布插件的应用无需执行。
 
 ### 2. 运行本仓库示例
 

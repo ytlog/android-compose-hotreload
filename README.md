@@ -24,32 +24,32 @@ State retention depends on the change and upstream Compose scope analysis. For e
 
 ## Use in an existing project
 
-For an existing Android application using Jetpack Compose. **The current integration builds from source through a Gradle composite build.** The local Maven directory below provides the pinned upstream dependencies built from source. First complete [source preparation](#1-prepare-the-source-and-artifacts) near the end of this page.
+For an existing Android application using Jetpack Compose. Version `0.1.0-alpha.2` of the Android plugin, host and runtime is published to Maven Central. The pinned JetBrains upstream artifacts resolve from its official public `firework` repository. No local checkout, `includeBuild`, Maven Local or `prepareUpstream` step is required for integration.
 
-These examples assume this repository and your app project share a parent directory. Adjust paths as needed and merge the snippets into your existing configuration.
+Merge these snippets into your application's existing configuration. Add the public upstream repository to both plugin and dependency resolution, restricted to the upstream group as shown.
 
 ### 1. Configure settings.gradle.kts
 
 ```kotlin
 pluginManagement {
-    includeBuild("../android-compose-hotreload")
     repositories {
-        maven(file("../android-compose-hotreload/upstream/compose-hot-reload/build/repo"))
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven("https://packages.jetbrains.team/maven/p/firework/dev") {
+            content { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
+        }
     }
 }
-
 dependencyResolutionManagement {
     repositories {
-        maven(file("../android-compose-hotreload/upstream/compose-hot-reload/build/repo"))
         google()
         mavenCentral()
+        maven("https://packages.jetbrains.team/maven/p/firework/dev") {
+            content { includeGroupAndSubgroups("org.jetbrains.compose.hot-reload") }
+        }
     }
 }
-
-includeBuild("../android-compose-hotreload")
 ```
 
 ### 2. Apply the plugin to your app module
@@ -59,7 +59,7 @@ Add the plugin to the existing `plugins` block in `app/build.gradle.kts`:
 ```kotlin
 plugins {
     // Keep your existing Android, Kotlin Android, and Compose compiler plugins.
-    id("io.github.ytlog.compose.hot-reload.android")
+    id("io.github.ytlog.compose.hot-reload.android") version "0.1.0-alpha.2"
 }
 ```
 
@@ -128,10 +128,10 @@ cd android-compose-hotreload
 # Replace this with your Android SDK path.
 export ANDROID_HOME="/path/to/Android/sdk"
 
-./gradlew prepareUpstream
+./gradlew androidCheck
 ```
 
-This builds the pinned JetBrains JVM artifacts and publishes them to `upstream/compose-hot-reload/build/repo`. Run it once before integrating, and again after updating the upstream source. Your app's composite build compiles the Android plugin, host, and runtime automatically.
+This verifies the Android modules against the pinned public dependencies. The repository sample uses a composite build for development of this plugin. To work on the vendored upstream itself, run `./gradlew prepareUpstream` and opt into its local artifacts with `-PuseLocalUpstream=true`; this is not needed by applications using the published plugin.
 
 ### 2. Run the repository sample
 

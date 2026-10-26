@@ -51,10 +51,6 @@ android {
     }
 
     buildFeatures { compose = true }
-
-    publishing {
-        singleVariant("release") { withSourcesJar() }
-    }
 }
 
 tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") }.configureEach {
@@ -78,10 +74,4 @@ dependencies {
     compileOnly(platform(libs.androidx.compose.bom))
     compileOnly(libs.androidx.compose.runtime)
     compileOnly(libs.androidx.compose.ui)
-}
-
-afterEvaluate {
-    publishing {
-        publications.create<MavenPublication>("release") { from(components["release"]) }
-    }
 }

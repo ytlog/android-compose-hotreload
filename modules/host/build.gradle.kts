@@ -44,10 +44,6 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-publishing {
-    publications.create<MavenPublication>("maven") { from(components["java"]) }
-}
-
 tasks.test {
     useJUnitPlatform()
     systemProperty("repository.root", rootProject.projectDir.absolutePath)

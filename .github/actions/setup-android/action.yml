@@ -1,0 +1,17 @@
+name: Set up Android build tools
+description: Install the Compose Android plugin toolchain.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '21'
+    - uses: gradle/actions/setup-gradle@v5
+    - uses: android-actions/setup-android@v3
+      with:
+        packages: platform-tools
+        log-accepted-android-sdk-licenses: false
+    - name: Install Android SDK packages
+      shell: bash
+      run: sdkmanager 'platforms;android-37.0' 'build-tools;35.0.0' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'

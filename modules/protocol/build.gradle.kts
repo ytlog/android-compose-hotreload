@@ -16,7 +16,3 @@ java {
 dependencies {
     testImplementation(libs.junit)
 }
-
-publishing {
-    publications.create<MavenPublication>("maven") { from(components["java"]) }
-}
