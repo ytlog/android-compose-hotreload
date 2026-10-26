@@ -27,6 +27,9 @@
 | AndroidView 保留原生状态时修改显示与业务逻辑 | `framework/androidview`；普通 remember 持有原对象，稳定 update 内部辅助方法刷新，原 View／tag、文本／选区保留及更新抛错后恢复 | 不覆盖任意 Compose 槽迁移、View 池复用、WebView 或复杂手势；update 应可重复执行，其他 Compose 版本另验 |
 | 修改原生按钮 lambda 和 TextWatcher 匿名监听器 | `framework/native-listener`；View 持有原对象，真实点击／setText 通知、精确次数、释放后不再通知和新对象对照 | 仅修改方法体，匿名捕获布局演进另立契约；setText 不替代键盘输入协议测试 |
 | 系统结果等待返回时修改回调或业务体 | `framework/activity-result`；真实子 Activity、registry 原回调、成功／取消各一次、前后台无重复、退出注销与新注册 | 显式不绑定 LifecycleOwner 的 registry 注册；不外推生命周期结果队列、权限请求、外部相机／文档提供器或进程死亡恢复 |
+| 修改 snapshotFlow 的计算和 collector | `framework/snapshot-flow`；相等结果去重、依赖分支切换、保留收集任务与页面对象、退出取消 | 不保证编辑代码本身触发 snapshot 写入；不覆盖任意 mutation policy |
+| 修改 derivedStateOf 计算 | `framework/derived-state`；普通 remember 页面、原派生状态对象及原输入保持，依赖变化后使用新计算 | 真正的初始化值或槽布局变化仍可重置；不保证无依赖变化时立即清除全部派生缓存 |
+| 生命周期收集中修改 Flow 转换 | `framework/lifecycle-flow`；真实子 Activity 停止父页面、停止时不交付、恢复时只交付最新 StateFlow 值，活跃期／停止期编辑后原页面保留 | 不覆盖自定义 LifecycleOwner、minActiveState 变更、任意挂起状态机迁移或进程死亡恢复 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、
@@ -41,7 +44,6 @@
 | 优先级 | 缺口与当前最接近的覆盖 | 最小补验标准 |
 | --- | --- | --- |
 | P2 | 绑定方法引用与匿名对象的捕获演进：已有 Java `String::toUpperCase` 和 Retrofit 匿名回调，但没有相应专项演进断言 | 保留 `service::method` 与 `object : Listener`，分别修改目标体、成员签名、捕获布局；检查原接收者数据和引用，区分成功、链接错误与拒绝；不能借用 LambdaMetafactory 捕获映射的结论 |
-| P2 | snapshotFlow、derivedStateOf 及生命周期收集策略的编辑：已有普通 Flow／Effect，框架组还检查 collectAsStateWithLifecycle 的订阅保持与前后台恢复 | 保留原派生状态和订阅，更新计算体后分别变更依赖、切换前后台；检查最新值、订阅数量、取消及恢复行为，按各 API 本身语义断言 |
 | P2 | 长会话与连接故障：已有 20 轮和主机退出测试 | 运行前固定会话时长、编辑次数、停顿与资源增长门槛；记录多个阶段的堆、线程、监听器和任务数量；另测 ADB 中断／恢复与失败提示，不把主机终止后的新进程称为原进程重连 |
 
 ## 需要独立契约的范围

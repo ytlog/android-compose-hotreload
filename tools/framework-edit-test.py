@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Targeted framework, native View/listener and Activity Result edits in a fixed sample APK.
+"""Targeted framework, native interop and reactive-state edits in a fixed sample APK.
 
 Run --scenario-group all for this new suite only; it does not run the original sample matrix.
 Raw evidence, generated sources and failed runs remain under ignored build/evidence/.
@@ -23,6 +23,7 @@ import zipfile
 from device_session import DeviceSession
 from ime_driver import ImeDriver
 from ui_driver import UiDriver
+from framework_reactive import ReactiveCases, REACTIVE_GROUPS
 from framework_interop import InteropCases, INTEROP_GROUPS
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,7 +33,7 @@ SOURCE = MODULE / 'src/main/java/dev/compose/hotreload/framework'
 APP = 'dev.compose.hotreload.framework'
 ACTIVITY = APP + '/.FrameworkActivity'
 FRAMEWORK_GROUPS = ['navigation', 'hilt', 'room', 'input']
-GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS
+GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS + REACTIVE_GROUPS
 sha = lambda data: hashlib.sha256(data).hexdigest()
 
 
@@ -517,6 +518,14 @@ def main():
             interop.start()
             for group in interop_groups:getattr(interop,group.replace('-', '_'))()
             interop.fresh_and_cleanup(interop_groups)
+        reactive_groups = [g for g in groups if g in REACTIVE_GROUPS]
+        if reactive_groups:
+            if framework_groups and not interop_groups:
+                runner.device.tap_text('Back')
+            reactive = ReactiveCases(runner)
+            reactive.start()
+            for group in reactive_groups:getattr(reactive, group.replace('-', '_'))()
+            reactive.fresh_and_cleanup()
         runner.session.check()
     except BaseException as error:
         runner.results.append(dict(name=runner.case.name if runner.case!=runner.evidence else 'startup',result='FAIL',error=type(error).__name__))

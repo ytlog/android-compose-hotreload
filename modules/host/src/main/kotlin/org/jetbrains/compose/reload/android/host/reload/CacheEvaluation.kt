@@ -2,7 +2,6 @@ package org.jetbrains.compose.reload.android.host.reload
 
 import org.jetbrains.compose.reload.analysis.ApplicationInfo
 import org.jetbrains.compose.reload.analysis.ClassId
-import org.objectweb.asm.Type
 import org.jetbrains.compose.reload.analysis.FieldId
 import org.jetbrains.compose.reload.analysis.MethodId
 import org.jetbrains.compose.reload.analysis.ScopeInfo
@@ -49,12 +48,11 @@ internal class CacheEvaluation(
             val before = current.methodIndex[id]
             val next = methods[id]
             if (before == null && next == null) {
-                // An opaque library may invoke a typed callback argument synchronously. Without
-                // its bytecode, preserve the conservative dependency on possible implementations.
-                Type.getArgumentTypes(id.methodDescriptor).filter {
-                    it.sort == Type.OBJECT && it.internalName != "java/lang/Object"
-                }.forEach { arg ->
-                    types(ClassId(arg.internalName)).forEach { type ->
+                // A known lazy factory stores its callback. A later read/collect remains an
+                // execution dependency; an unknown library still may invoke typed arguments.
+                if (DeferredLibraryCalls.defers(id)) continue
+                DeferredLibraryCalls.evaluatedTypes(id).forEach { type ->
+                    types(type).forEach { type ->
                         deferred[type].orEmpty().forEach(::enqueue)
                         (current.classIndex[type]?.methods.orEmpty().keys + after[type]?.methods.orEmpty().keys)
                             .filter { it.methodName != "<init>" && it.methodName != "<clinit>" }

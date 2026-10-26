@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的七组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener` 或 `activity-result` 单组定位，也可以用
+这里的 `all` **只运行本页的十组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state` 或 `lifecycle-flow` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -31,6 +31,22 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
 
 这三组直接进入互操作页，不执行详情页的 Hilt／Room／IME 场景，也不切换设备输入法。
 它们仍使用同一个固定应用 ID 和原 UI 辅助包。
+
+只验收响应式状态的新增场景时使用：
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN \
+  --art-dcevm-version VERSION --scenario-group snapshot-flow derived-state lifecycle-flow
+```
+
+这三组直接进入普通 `remember` 持有的响应式页面，使用固定框架应用与原 UI 辅助包，
+不切换输入法。核对原进程、页面对象、草稿和选区；草稿由夹具初始值提供，不以此替代输入组的真实输入协议验证。
+`snapshot-flow` 检查相等结果去重、切换实际读取的 snapshot 依赖、原计算和 collector 方法体更新，
+不把单纯代码重载当成一次 snapshot 写入。`derived-state` 检查派生值和依赖更新，并直接修改原计算 lambda；snapshotFlow 另直接修改原 snapshot 计算块，生命周期组直接修改原 map 块。
+`lifecycle-flow` 检查 `collectAsStateWithLifecycle` 活跃期的 map 更新；通过真实不透明子 Activity
+停止父页面，等待当前进程取消日志后连续更新原 StateFlow，确认停止时无交付、恢复后只交付最新值，
+并在停止期间修改转换体后返回。各组还检查 GC、页面移除后的取消和重新进入后的新对象。
+这不覆盖任意 snapshot mutation policy、自定义 LifecycleOwner、minActiveState 切换或进程死亡恢复。
 
 Hilt／KSP 插件在 sample 根构建仅声明 `apply false`，避免父子插件类加载器选择不同的
 JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `ScopedArtifact.CLASSES`
@@ -86,6 +102,31 @@ TextWatcher 的通知由对真实 EditText 的 `setText` 触发；键盘输入�
 视为成功；其他 Compose 版本仍需单独设备验证。
 
 这两项曾经失败的行为现在作为正向回归检查；旧失败日志仍保留于本地，不改写为新版本通过。
+
+## 响应式状态的初始化与执行边界
+
+响应式页直接使用 `remember { ReactiveState() }` 和 `remember { derivedStateOf { … } }`，
+没有 ViewModel 持有者。runner 检查原页面及原派生状态对象标识、非零输入计数、草稿和选区，
+同时核对 snapshotFlow 启停及生命周期收集的精确次数。只出现正确的新文字不能算状态保留。
+派生值在实际依赖写入后检查；代码重载本身不保证让所有缓存的派生值立即重算。
+
+主机对未进入 upstream 类分析的库使用明确的延后执行契约，按完整 owner、方法名和
+JVM descriptor 匹配 `derivedStateOf` 两个公开重载、`snapshotFlow`、`flow`、`onStart`、
+`onEach`、`onCompletion`。它们创建计算／流管道时不执行被保存的回调，因此回调体变化
+只要求重组，不应清空所属页面的 remember 槽。语义依据见
+[Compose 副作用 API](https://developer.android.com/develop/ui/compose/side-effects)及
+[Flow 中间操作](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-flow/)。
+
+若在 remember 初始化内读取 `State.value`、调用 `Flow.collect` 或将这些包装对象交给
+未知外部消费者，则仍追踪其延后计算依赖；初始化实际执行的计算体变化继续要求重置。
+主机测试分别检查创建／消费路径、class lambda／indy lambda、未知 owner／重载及原有
+初始化重置规则。未列入契约的 API 继续保守分析；不按包名前缀把所有 Flow 或 Compose
+方法都视为延后执行。没有修改引擎、协程调度、Compose 私有缓存或页面状态的存放位置。
+
+直接修改同一 Kotlin 文件中的 lambda 还会改变编译器生成的 `ComposableSingletons` 源码位置。
+lambda 身份指纹忽略精确 Compose 调试调用（`sourceInformation`、`sourceInformationMarkerStart`、
+`traceEventStart`）的最后一个立即字符串常量，避免把字符偏移变化误认成多个回调的业务修改。
+归一化只用于比较指纹，下发方法保留最新源码信息；业务字符串、未知调用、真实歧义与捕获绑定保护不放宽。
 
 ## 输入法与设备准备
 

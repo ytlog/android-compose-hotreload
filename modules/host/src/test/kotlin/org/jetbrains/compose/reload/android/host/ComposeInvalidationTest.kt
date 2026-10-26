@@ -1,6 +1,9 @@
 package org.jetbrains.compose.reload.android.host
 
 import org.jetbrains.compose.reload.analysis.ClassInfo
+import org.jetbrains.compose.reload.analysis.ClassId
+import org.jetbrains.compose.reload.analysis.MethodId
+import org.jetbrains.compose.reload.android.host.reload.DeferredLibraryCalls
 import org.jetbrains.compose.reload.analysis.MutableApplicationInfo
 import org.jetbrains.compose.reload.android.host.reload.composeInvalidation
 import org.objectweb.asm.ClassWriter
@@ -18,7 +21,10 @@ class ComposeInvalidationTest {
                     cacheField: Boolean = false, initial: String = "old field",
                     outside: Boolean = false, debug: Boolean = true, keyComparison: Int = 0,
                     factory: Boolean = false, invoke: Boolean = false, eager: Boolean = false,
-                    classLambda: Boolean = false, library: Boolean = false, initializer: String? = null) =
+                    classLambda: Boolean = false, library: Boolean = false, initializer: String? = null,
+                    lazyApi: MethodId? = null, readWrapper: Boolean = false,
+                    callbackType: String = "java/util/function/Supplier", callbackMethod: String = "get",
+                    callbackArgs: String = "") =
         MutableApplicationInfo().apply {
             add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
                 visit(V11, ACC_PUBLIC, "fixture/Screen", null, "java/lang/Object", null)
@@ -68,10 +74,10 @@ class ComposeInvalidationTest {
                         if (cacheField) {
                             visitFieldInsn(GETSTATIC, "fixture/Screen", "initial", "Ljava/lang/String;")
                         } else if (lambda) {
-                            visitInvokeDynamicInsn("get", "()Ljava/util/function/Supplier;",
+                            visitInvokeDynamicInsn(callbackMethod, "()L$callbackType;",
                                 Handle(H_INVOKESTATIC, "java/lang/invoke/LambdaMetafactory", "metafactory",
                                     "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;", false),
-                                Type.getMethodType("()Ljava/lang/Object;"),
+                                Type.getMethodType("($callbackArgs)Ljava/lang/Object;"),
                                 Handle(H_INVOKESTATIC, "fixture/Screen", "helper", "()Ljava/lang/String;", false),
                                 Type.getMethodType("()Ljava/lang/String;"))
                         } else if (outside) {
@@ -101,8 +107,21 @@ class ComposeInvalidationTest {
                 visitMethod(ACC_PUBLIC or ACC_STATIC, "helper", "()Ljava/lang/String;", null, null).apply {
                     visitCode()
                     if (factory) {
-                        visitMethodInsn(INVOKESTATIC, "fixture/Screen", "factory", "()Ljava/util/function/Supplier;", false)
-                        if (library) {
+                        visitMethodInsn(INVOKESTATIC, "fixture/Screen", "factory", "()L$callbackType;", false)
+                        if (lazyApi != null) {
+                            if (Type.getArgumentTypes(lazyApi.methodDescriptor).size == 2) {
+                                visitInsn(ACONST_NULL); visitInsn(SWAP)
+                            }
+                            visitMethodInsn(INVOKESTATIC, lazyApi.classId.value, lazyApi.methodName, lazyApi.methodDescriptor, false)
+                            if (readWrapper) {
+                                val owner = Type.getReturnType(lazyApi.methodDescriptor).internalName
+                                if (owner == "kotlinx/coroutines/flow/Flow") {
+                                    visitInsn(ACONST_NULL); visitInsn(ACONST_NULL)
+                                    visitMethodInsn(INVOKEINTERFACE, owner, "collect", "(Lkotlinx/coroutines/flow/FlowCollector;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;", true)
+                                } else visitMethodInsn(INVOKEINTERFACE, owner, "getValue", "()Ljava/lang/Object;", true)
+                                visitTypeInsn(CHECKCAST, "java/lang/String")
+                            } else { visitInsn(POP); visitLdcInsn("deferred") }
+                        } else if (library) {
                             visitMethodInsn(INVOKESTATIC, "library/Consumer", "consume", "(Ljava/util/function/Supplier;)Ljava/lang/String;", false)
                         } else if (invoke) {
                             visitMethodInsn(INVOKEINTERFACE, "java/util/function/Supplier", "get", "()Ljava/lang/Object;", true)
@@ -112,42 +131,88 @@ class ComposeInvalidationTest {
                     visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
                 }
                 if (factory) {
-                    visitMethod(ACC_PUBLIC or ACC_STATIC, "callback", "()Ljava/lang/String;", null, null).apply {
+                    visitMethod(ACC_PUBLIC or ACC_STATIC, "callback", "($callbackArgs)Ljava/lang/String;", null, null).apply {
                         visitCode(); visitLdcInsn(helper); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
                     }
-                    visitMethod(ACC_PUBLIC or ACC_STATIC, "factory", "()Ljava/util/function/Supplier;", null, null).apply {
+                    visitMethod(ACC_PUBLIC or ACC_STATIC, "factory", "()L$callbackType;", null, null).apply {
                         visitCode()
                         if (eager) {
-                            visitMethodInsn(INVOKESTATIC, "fixture/Screen", "callback", "()Ljava/lang/String;", false)
+                            visitMethodInsn(INVOKESTATIC, "fixture/Screen", "callback", "($callbackArgs)Ljava/lang/String;", false)
                             visitInsn(POP)
                         }
                         if (classLambda) {
                             visitTypeInsn(NEW, "fixture/Listener"); visitInsn(DUP)
                             visitMethodInsn(INVOKESPECIAL, "fixture/Listener", "<init>", "()V", false)
-                        } else visitInvokeDynamicInsn("get", "()Ljava/util/function/Supplier;",
+                        } else visitInvokeDynamicInsn(callbackMethod, "()L$callbackType;",
                             Handle(H_INVOKESTATIC, "java/lang/invoke/LambdaMetafactory", "metafactory",
                                 "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;", false),
-                            Type.getMethodType("()Ljava/lang/Object;"),
-                            Handle(H_INVOKESTATIC, "fixture/Screen", "callback", "()Ljava/lang/String;", false),
-                            Type.getMethodType("()Ljava/lang/String;"))
+                            Type.getMethodType("($callbackArgs)Ljava/lang/Object;"),
+                            Handle(H_INVOKESTATIC, "fixture/Screen", "callback", "($callbackArgs)Ljava/lang/String;", false),
+                            Type.getMethodType("($callbackArgs)Ljava/lang/String;"))
                         visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
                     }
                 }
                 visitEnd()
             }.toByteArray())))
             if (classLambda) add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
-                visit(V11, ACC_PUBLIC, "fixture/Listener", null, "java/lang/Object", arrayOf("java/util/function/Supplier"))
+                visit(V11, ACC_PUBLIC, "fixture/Listener", null, "java/lang/Object", arrayOf(callbackType))
                 visitMethod(ACC_PUBLIC, "<init>", "()V", null, null).apply {
                     visitCode(); visitVarInsn(ALOAD, 0)
                     visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false)
                     visitInsn(RETURN); visitMaxs(0, 0); visitEnd()
                 }
-                visitMethod(ACC_PUBLIC, "get", "()Ljava/lang/Object;", null, null).apply {
+                visitMethod(ACC_PUBLIC, callbackMethod, "($callbackArgs)Ljava/lang/Object;", null, null).apply {
                     visitCode(); visitLdcInsn(helper); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
                 }
                 visitEnd()
             }.toByteArray())))
         }
+
+    private data class LazyApi(val method: MethodId, val arity: Int)
+    private val lazyApis = listOf(
+        LazyApi(MethodId(ClassId("androidx/compose/runtime/SnapshotStateKt"), "derivedStateOf",
+            "(Lkotlin/jvm/functions/Function0;)Landroidx/compose/runtime/State;"), 0),
+        LazyApi(MethodId(ClassId("androidx/compose/runtime/SnapshotStateKt"), "derivedStateOf",
+            "(Landroidx/compose/runtime/SnapshotMutationPolicy;Lkotlin/jvm/functions/Function0;)Landroidx/compose/runtime/State;"), 0),
+        LazyApi(MethodId(ClassId("androidx/compose/runtime/SnapshotStateKt"), "snapshotFlow",
+            "(Lkotlin/jvm/functions/Function0;)Lkotlinx/coroutines/flow/Flow;"), 0),
+        LazyApi(MethodId(ClassId("kotlinx/coroutines/flow/FlowKt"), "flow",
+            "(Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/flow/Flow;"), 2),
+        *listOf("onStart", "onEach", "onCompletion").map { name ->
+            val arity = if (name == "onCompletion") 3 else 2
+            LazyApi(MethodId(ClassId("kotlinx/coroutines/flow/FlowKt"), name,
+                "(Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function$arity;)Lkotlinx/coroutines/flow/Flow;"), arity)
+        }.toTypedArray(),
+    )
+
+    @Test
+    fun `lazy library factories retain state for deferred body edits but consumers still reset`() {
+        for ((api, arity) in lazyApis) for (read in listOf(false, true)) for (classLambda in listOf(false, true)) {
+            fun fixture(value: String) = app(cache = true, factory = true, lazyApi = api, readWrapper = read,
+                classLambda = classLambda, callbackType = "kotlin/jvm/functions/Function$arity", callbackMethod = "invoke",
+                callbackArgs = "Ljava/lang/Object;".repeat(arity), helper = value)
+            val before = fixture("before")
+            val after = fixture("after")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(if (read) intArrayOf(100) else intArrayOf(),
+                composeInvalidation(before, after, dirty).reset, "$api read=$read classLambda=$classLambda")
+        }
+    }
+
+    @Test
+    fun `lazy contracts do not cover lookalike owners overloads or terminal operations`() {
+        val known = lazyApis.first().method
+        assertTrue(DeferredLibraryCalls.defers(known))
+        assertTrue(!DeferredLibraryCalls.defers(MethodId(ClassId("fixture/SnapshotStateKt"), known.methodName, known.methodDescriptor)))
+        assertTrue(!DeferredLibraryCalls.defers(MethodId(known.classId, known.methodName,
+            "(Lkotlin/jvm/functions/Function0;I)Landroidx/compose/runtime/State;")))
+        assertTrue(!DeferredLibraryCalls.defers(MethodId(ClassId("kotlinx/coroutines/flow/FlowKt"), "launchIn",
+            "(Lkotlinx/coroutines/flow/Flow;Lkotlinx/coroutines/CoroutineScope;)Lkotlinx/coroutines/Job;")))
+        val consumer = MethodId(ClassId("library/Consumer"), "consume", "(Landroidx/compose/runtime/State;Lkotlinx/coroutines/flow/Flow;)V")
+        val types = DeferredLibraryCalls.evaluatedTypes(consumer)
+        assertTrue(ClassId("kotlin/jvm/functions/Function0") in types)
+        assertTrue(ClassId("kotlin/jvm/functions/Function3") in types)
+    }
 
     @Test
     fun `opaque library accepting a callback must conservatively reset`() {

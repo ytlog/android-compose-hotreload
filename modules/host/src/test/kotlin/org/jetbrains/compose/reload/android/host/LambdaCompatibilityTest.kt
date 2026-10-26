@@ -170,6 +170,63 @@ class LambdaCompatibilityTest {
         assertEquals("new:0:false:0.0:3.5:42:kept", invoke(b, old, 42L, "kept", 3.5))
     }
 
+    private fun sourceLocations(code: ByteArray, offset: Int, owner: String = "androidx/compose/runtime/ComposerKt"): ByteArray {
+        val node = readClass(code)
+        node.methods.filter { it.name.contains("\$lambda\$") }.forEachIndexed { index, method ->
+            method.instructions.insert(InsnList().apply {
+                add(InsnNode(Opcodes.ACONST_NULL))
+                add(LdcInsnNode("C0@${offset + index}L1:Screen.kt#fixture"))
+                add(MethodInsnNode(Opcodes.INVOKESTATIC, owner, "sourceInformation",
+                    "(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V", false))
+            })
+        }
+        return ClassWriter(ClassWriter.COMPUTE_MAXS).also(node::accept).toByteArray()
+    }
+
+    private fun sourceInformationStubs(): Map<ClassId, ByteArray> {
+        val composer = ClassWriter(0).apply {
+            visit(Opcodes.V11, Opcodes.ACC_PUBLIC or Opcodes.ACC_ABSTRACT or Opcodes.ACC_INTERFACE,
+                "androidx/compose/runtime/Composer", null, "java/lang/Object", null); visitEnd()
+        }.toByteArray()
+        val intrinsics = ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
+            visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "androidx/compose/runtime/ComposerKt", null, "java/lang/Object", null)
+            visitMethod(Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC, "sourceInformation",
+                "(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V", null, null).apply {
+                visitCode(); visitInsn(Opcodes.RETURN); visitMaxs(0, 0); visitEnd()
+            }
+            visitEnd()
+        }.toByteArray()
+        return mapOf(ClassId("androidx/compose/runtime/Composer") to composer,
+            ClassId("androidx/compose/runtime/ComposerKt") to intrinsics)
+    }
+
+    @Test
+    fun `shifted Compose source offsets preserve multiple retained closures and emitted debug information`() {
+        val first = listOf(body(text = "first"), body("factory\$lambda\$1", text = "second"))
+        val a = plan(sourceLocations(fixture(first), 10))
+        val entries = a.state.entries.filter { it.lambdaId != null }
+        val b = plan(sourceLocations(fixture(first), 100), a.state, 2)
+        val c = plan(sourceLocations(fixture(listOf(body(text = "updated"), first.last())), 200), b.state, 3)
+        val executable = c.copy(classes = c.classes + sourceInformationStubs())
+        assertEquals("updated:kept", invoke(executable, entries[0], "kept"))
+        assertEquals("second:kept", invoke(executable, entries[1], "kept"))
+        val literals = readClass(c.classes.getValue(id)).methods.flatMap { it.instructions.filterIsInstance<LdcInsnNode>() }.map { it.cst }
+        assertTrue("C0@200L1:Screen.kt#fixture" in literals, "Only the fingerprint may normalize source information")
+    }
+
+    @Test
+    fun `source shaped business strings and lookalike intrinsics do not relax ambiguity rejection`() {
+        val a = plan(fixture(listOf(body(text = "C0@10L1:Screen.kt"), body("factory\$lambda\$1", text = "C0@20L1:Screen.kt"))))
+        assertFailsWith<IllegalStateException> {
+            plan(fixture(listOf(body(text = "C0@11L1:Screen.kt"), body("factory\$lambda\$1", text = "C0@21L1:Screen.kt"))), a.state, 2)
+        }
+        val bodies = listOf(body(text = "first"), body("factory\$lambda\$1", text = "second"))
+        val lookalike = plan(sourceLocations(fixture(bodies), 10, "fixture/ComposerKt"))
+        assertFailsWith<IllegalStateException> {
+            plan(sourceLocations(fixture(bodies), 20, "fixture/ComposerKt"), lookalike.state, 2)
+        }
+    }
+
     @Test
     fun `ambiguous edited insertion is rejected and discarded attempt cannot alter active entries`() {
         val a = plan(fixture(listOf(body())))

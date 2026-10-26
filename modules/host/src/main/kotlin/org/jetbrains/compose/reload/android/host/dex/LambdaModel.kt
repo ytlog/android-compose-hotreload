@@ -78,7 +78,13 @@ internal fun sourceLambdas(node: ClassNode): List<SourceLambda> = node.lambdaSit
             fingerprint(method, target.invocationType()))
     }
 
-/** Ignore line/frame/debug changes and the compiler's numbered implementation name. */
+/** Ignore debug locations (including Compose source offsets) and numbered implementation names. */
+private val composeSourceCalls = setOf(
+    "sourceInformation" to "(Landroidx/compose/runtime/Composer;Ljava/lang/String;)V",
+    "sourceInformationMarkerStart" to "(Landroidx/compose/runtime/Composer;ILjava/lang/String;)V",
+    "traceEventStart" to "(IIILjava/lang/String;)V",
+)
+
 private fun fingerprint(method: MethodNode, type: Type): List<Byte> {
     val copy = copyMethod(method).apply {
         name = "body"
@@ -92,6 +98,16 @@ private fun fingerprint(method: MethodNode, type: Type): List<Byte> {
         invisibleParameterAnnotations = null
         attrs = null
         instructions.toArray().filter { it is LineNumberNode || it is FrameNode }.forEach(instructions::remove)
+        // Inserting text earlier in a Kotlin file shifts sourceInformation in *every* generated
+        // ComposableSingletons body. It is tooling metadata, not callback identity. Normalize
+        // only an immediate literal at an exact compiler intrinsic; emitted bodies stay intact.
+        instructions.filterIsInstance<MethodInsnNode>().filter { call ->
+            call.opcode == Opcodes.INVOKESTATIC && call.owner == "androidx/compose/runtime/ComposerKt" &&
+                (call.name to call.desc) in composeSourceCalls
+        }.forEach { call ->
+            val argument = generateSequence(call.previous) { it.previous }.firstOrNull { it.opcode >= 0 }
+            if (argument is LdcInsnNode && argument.cst is String) argument.cst = "<compose-source-location>"
+        }
     }
     val writer = ClassWriter(0)
     writer.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "LambdaBody", null, "java/lang/Object", null)
