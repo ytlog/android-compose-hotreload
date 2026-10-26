@@ -97,7 +97,7 @@ plugins {
 | Android SDK | Platform 37；应用的 `compileSdk` 至少为 37 |
 | Native 构建工具（构建设备 runtime） | NDK `27.2.12479018`、CMake `3.22.1`，用于编译本项目的 JVMTI 代理 |
 | Gradle / AGP / Kotlin | Gradle `8.14.4`、AGP `8.11.1`、Kotlin `2.3.21` |
-| ART 重定义引擎 | `io.github.ytlog:artdcevm:0.1.0-alpha.3` |
+| ART 重定义引擎 | `io.github.ytlog:artdcevm:0.1.0-alpha.4` |
 
 art-dcevm 及其依赖要求 `compileSdk 37`。使用 AGP `8.11.1` 时，可在应用工程的 `gradle.properties` 中加入 `android.suppressUnsupportedCompileSdk=37`，配合当前配置构建。
 

@@ -97,7 +97,7 @@ The following build configuration has been used for validation:
 | Android SDK | Platform 37; the app's `compileSdk` must be at least 37 |
 | Native build tools (building the device runtime) | NDK `27.2.12479018` and CMake `3.22.1`, used to compile this project's JVMTI agent |
 | Gradle / AGP / Kotlin | Gradle `8.14.4`, AGP `8.11.1`, Kotlin `2.3.21` |
-| ART redefinition engine | `io.github.ytlog:artdcevm:0.1.0-alpha.3` |
+| ART redefinition engine | `io.github.ytlog:artdcevm:0.1.0-alpha.4` |
 
 art-dcevm and its dependencies require `compileSdk 37`. With AGP `8.11.1`, you can add `android.suppressUnsupportedCompileSdk=37` to your app project's `gradle.properties` to build with the current configuration.
 
