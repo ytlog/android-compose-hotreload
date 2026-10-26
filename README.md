@@ -20,7 +20,7 @@ Real application edit cases and Maven Local engine integration: [validation guid
 - **Use developer tools:** inspect reload results, handle composition errors, and reset UI state through devtools.
 - **Inspect failures and retry:** ART rejection details are reported to devtools. Failed source changes remain pending, so you can revert an unsupported change or complete an implementation and reload again.
 
-State retention depends on the change and upstream Compose scope analysis. For example, changing the total number of lines in a source file may cause a composable containing `remember` to reset. See [state resets](docs/android.md#state-resets-upstream-behavior).
+Supported business-logic and retained-callback edits preserve ordinary `remember` state when its initialization and Compose slot layout remain compatible. This includes the verified retained AndroidView and snapshotFlow / derivedStateOf / lifecycle collection cases; state does not need to move into a ViewModel. See the [real-page validation](docs/real-edits.md) and [framework cases](docs/framework-edits.zh-CN.md) for the tested edits and conditions.
 
 ## Use in an existing project
 
@@ -97,7 +97,7 @@ The following build configuration has been used for validation:
 | Android SDK | Platform 37; the app's `compileSdk` must be at least 37 |
 | Native build tools (building the device runtime) | NDK `27.2.12479018` and CMake `3.22.1`, used to compile this project's JVMTI agent |
 | Gradle / AGP / Kotlin | Gradle `8.14.4`, AGP `8.11.1`, Kotlin `2.3.21` |
-| ART redefinition engine | `io.github.ytlog:artdcevm:0.1.0-alpha.3` |
+| ART redefinition engine | `io.github.ytlog:artdcevm:0.1.0-alpha.4` |
 
 art-dcevm and its dependencies require `compileSdk 37`. With AGP `8.11.1`, you can add `android.suppressUnsupportedCompileSdk=37` to your app project's `gradle.properties` to build with the current configuration.
 
@@ -111,7 +111,7 @@ art-dcevm and its dependencies require `compileSdk 37`. With AGP `8.11.1`, you c
 - Multi-process apps and minified variants are not supported yet.
 - Desktop window features in devtools are not connected to Android yet, including screenshots, semantics trees, UI actions, and window resizing.
 - IDE plugin run configurations for Android, `ReloadEffects`, and the `AfterHotReloadEffect` / `invokeAfterHotReload` hooks are not connected yet.
-- `remember` state may reset when Compose scopes change. Hot reload does not guarantee state retention for every edit.
+- Changes to `remember` initialization or Compose slot layout can reset the affected group; missing analysis metadata or unavailable Compose refresh APIs can also require a reset. Supported edits to deferred callbacks preserve their containing state, but arbitrary slot or suspended-coroutine state migration is not guaranteed. A `derivedStateOf` calculation uses the new code when a dependency invalidates its cached result; reloading code alone does not force that invalidation.
 
 See the [Android guide](docs/android.md#limitations) for more platform differences and limitations.
 
