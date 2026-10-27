@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的十组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state` 或 `lifecycle-flow` 单组定位，也可以用
+这里的 `all` **只运行本页的十三组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 或 `animation-gestures` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -47,6 +47,26 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
 停止父页面，等待当前进程取消日志后连续更新原 StateFlow，确认停止时无交付、恢复后只交付最新值，
 并在停止期间修改转换体后返回。各组还检查 GC、页面移除后的取消和重新进入后的新对象。
 这不覆盖任意 snapshot mutation policy、自定义 LifecycleOwner、minActiveState 切换或进程死亡恢复。
+
+只验收弹层、分页／翻页、动画／手势时使用：
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN \
+  --art-dcevm-version VERSION --scenario-group overlays paging-pager animation-gestures
+```
+
+这三组复用固定应用与 UI 辅助包，不切换输入法。状态由普通 `remember` 持有，
+不改用 ViewModel。`overlays` 在 AlertDialog／ModalBottomSheet 打开时修改显示业务与保留回调，
+核对父页面草稿／选区、弹层局部状态、SheetState 身份及关闭次数；草稿由按钮设置，
+不替代独立输入法组。`paging-pager` 使用 Paging 3.3.6 的真实 PagingSource、cachedIn、
+collectAsLazyPagingItems、LazyColumn 和 HorizontalPager，在可控挂起的追加请求与错误重试期间编辑，
+检查原流、列表／Pager 状态、当前页局部计数与返回数据。请求用内存数据源和显式 gate 保持确定性，
+不声称覆盖 RemoteMediator、数据库分页或真实服务端。`animation-gestures` 在 Animatable 运行中
+修改帧回调，在实际注入的 DOWN／MOVE／UP 跨热更新期间修改 pointerInput 逻辑，
+检查对象、进度、原协程与精确事件数；不代表全部 Transition、动画规格或多指手势。
+`animation-gestures` 支持 `--motion-phase animation` 或 `--motion-phase gestures`，
+用于只补验失败部分。公开版本验收须使用独立消费工程和公开仓库，核对解析产物与 APK 内引擎哈希；
+不能将此处开发 runner 的 Maven Local 结果记成公开包实测。
 
 Hilt／KSP 插件在 sample 根构建仅声明 `apply false`，避免父子插件类加载器选择不同的
 JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `ScopedArtifact.CLASSES`

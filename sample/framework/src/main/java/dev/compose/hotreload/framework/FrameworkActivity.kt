@@ -57,6 +57,11 @@ fun FrameworkScreen() {
                     Button(onClick = { nav.navigate("detail/43") }) { Text("Open 43") }
                     Button(onClick = { nav.navigate("interop") }) { Text("Open interop") }
                     Button(onClick = { nav.navigate("reactive") }) { Text("Open reactive") }
+                    Row {
+                        Button(onClick = { nav.navigate("overlays") }) { Text("Overlays") }
+                        Button(onClick = { nav.navigate("paging") }) { Text("Paging") }
+                        Button(onClick = { nav.navigate("motion") }) { Text("Motion") }
+                    }
                     Text("Reactive disposed: ${ReactiveAudit.disposed}", fontSize = 10.sp)
                     Text("Interop audit: ${interopAuditSummary()}", fontSize = 10.sp)
                 }
@@ -68,6 +73,9 @@ fun FrameworkScreen() {
             composable("review") { Text("Review page") }
             composable("interop") { InteropScreen() }
             composable("reactive") { ReactiveScreen() }
+            composable("overlays") { OverlayScreen() }
+            composable("paging") { PagingScreen() }
+            composable("motion") { MotionScreen() }
         }
         Text("Ledger: ${FrameworkLedger.events.joinToString(";")}", fontSize = 8.sp, maxLines = 2)
     }

@@ -25,6 +25,7 @@ from ime_driver import ImeDriver
 from ui_driver import UiDriver
 from framework_reactive import ReactiveCases, REACTIVE_GROUPS
 from framework_interop import InteropCases, INTEROP_GROUPS
+from framework_ui import UiFeatureCases, UI_GROUPS
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -33,7 +34,7 @@ SOURCE = MODULE / 'src/main/java/dev/compose/hotreload/framework'
 APP = 'dev.compose.hotreload.framework'
 ACTIVITY = APP + '/.FrameworkActivity'
 FRAMEWORK_GROUPS = ['navigation', 'hilt', 'room', 'input']
-GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS + REACTIVE_GROUPS
+GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS + REACTIVE_GROUPS + UI_GROUPS
 sha = lambda data: hashlib.sha256(data).hexdigest()
 
 
@@ -496,6 +497,8 @@ def main():
     parser.add_argument('--device-id',required=True)
     parser.add_argument('--art-dcevm-version',required=True)
     parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
+    parser.add_argument('--motion-phase', choices=['all', 'animation', 'gestures'], default='all',
+                        help='Retry only the pending portion of animation-gestures')
     args=parser.parse_args()
     if not args.serial or not re.fullmatch('[a-z0-9-]+',args.device_id) or args.device_id==args.serial:
         parser.error('Select a device and supply a separate anonymous --device-id')
@@ -526,6 +529,12 @@ def main():
             reactive.start()
             for group in reactive_groups:getattr(reactive, group.replace('-', '_'))()
             reactive.fresh_and_cleanup()
+        ui_groups = [g for g in groups if g in UI_GROUPS]
+        if ui_groups:
+            if framework_groups and not interop_groups and not reactive_groups:
+                runner.device.tap_text('Back')
+            ui_cases = UiFeatureCases(runner)
+            for group in ui_groups:getattr(ui_cases, group.replace('-', '_'))()
         runner.session.check()
     except BaseException as error:
         runner.results.append(dict(name=runner.case.name if runner.case!=runner.evidence else 'startup',result='FAIL',error=type(error).__name__))

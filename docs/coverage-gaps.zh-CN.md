@@ -30,6 +30,9 @@
 | 修改 snapshotFlow 的计算和 collector | `framework/snapshot-flow`；相等结果去重、依赖分支切换、保留收集任务与页面对象、退出取消 | 不保证编辑代码本身触发 snapshot 写入；不覆盖任意 mutation policy |
 | 修改 derivedStateOf 计算 | `framework/derived-state`；普通 remember 页面、原派生状态对象及原输入保持，依赖变化后使用新计算 | 真正的初始化值或槽布局变化仍可重置；不保证无依赖变化时立即清除全部派生缓存 |
 | 生命周期收集中修改 Flow 转换 | `framework/lifecycle-flow`；真实子 Activity 停止父页面、停止时不交付、恢复时只交付最新 StateFlow 值，活跃期／停止期编辑后原页面保留 | 不覆盖自定义 LifecycleOwner、minActiveState 变更、任意挂起状态机迁移或进程死亡恢复 |
+| 弹层保持打开时修改显示与回调 | `framework/overlays`；AlertDialog、ModalBottomSheet、父页面草稿、弹层局部状态、SheetState 与关闭次数 | 草稿由夹具按钮设置；不替代真实输入法覆盖，不外推任意弹层结构和作用域变化 |
+| 分页请求等待／失败期间更新，保留当前翻页状态 | `framework/paging-pager`；真实 PagingSource、cachedIn、LazyPagingItems、LazyColumn、HorizontalPager，等待请求／重试的新结果、可见行锚点及页内状态 | 内存数据源与显式等待 gate；不外推 RemoteMediator、网络／数据库分页或全部 Paging 版本 |
+| 动画进行中、手指按住时修改原回调 | `framework/animation-gestures`；Animatable 原对象／帧回调、任务及取消次数，pointerInput 跨更新的同一次 DOWN／MOVE／UP | 单指输入与兼容方法体编辑；不外推任意 Transition、状态机／捕获布局演进或多指竞争 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、
