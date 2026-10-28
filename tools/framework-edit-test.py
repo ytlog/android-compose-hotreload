@@ -26,6 +26,7 @@ from ui_driver import UiDriver
 from framework_reactive import ReactiveCases, REACTIVE_GROUPS
 from framework_interop import InteropCases, INTEROP_GROUPS
 from framework_ui import UiFeatureCases, UI_GROUPS
+from framework_callbacks import PermissionFixture
 from framework_integrations import IntegrationCases, INTEGRATION_GROUPS
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -310,6 +311,7 @@ class Runner:
         self.device=module.Device(args.serial)
         self.ui=UiDriver(self.device,self.evidence)
         self.ime=ImeDriver(self.device,self.evidence) if any(g in args.scenario_group for g in ['all','input']) else None
+        self.permission_fixture=PermissionFixture(self) if any(g in args.scenario_group for g in ['all','permission-launcher']) else None
         self.session=DeviceSession(self.device,self.evidence,APP)
         self.environment=dict(os.environ,ANDROID_SERIAL=args.serial,ORG_GRADLE_PROJECT_artDcevmVersion=args.art_dcevm_version)
         self.originals={p:p.read_bytes() for p in SOURCE.glob('*') if p.is_file()}
@@ -419,6 +421,7 @@ class Runner:
                     stdout=log,stderr=subprocess.STDOUT,check=True,timeout=90)
         (self.evidence/'installation.json').write_text(json.dumps({'package':APP,'reusedInstalledApk':reused,
             'apkSha256':sha(apk.read_bytes())}))
+        if self.permission_fixture:self.permission_fixture.prepare()
         self.session.start()
         with (self.evidence/'prepare-probe.log').open('w') as log:
             subprocess.run([str(ROOT/'gradlew'),':hot-reload-android-host:prepareWorkflowProbe','--console=plain'],cwd=ROOT,
@@ -476,11 +479,13 @@ class Runner:
         try:
             # End monitoring before restoration so cleanup works after a rejected session too.
             cleanup('session', self.session.close)
+            if self.permission_fixture:cleanup('permission-dialog', self.permission_fixture.dismiss_pending)
             if self.ime:cleanup('ime', self.ime.close)
             cleanup('ui', self.ui.close)
             if self.host_log.exists():
                 cleanup('host-log', lambda: shutil.copyfile(self.host_log, self.evidence/'host.log'))
             cleanup('host', stop_host)
+            if self.permission_fixture:cleanup('permission', self.permission_fixture.close)
         finally:
             # Source restoration must not be skipped because a device or host cleanup failed.
             for path, data in self.originals.items():

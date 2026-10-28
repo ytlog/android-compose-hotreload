@@ -4,12 +4,13 @@ import re
 import time
 import xml.etree.ElementTree as ET
 
-from framework_ui import UiFeatureCases, APP
+from framework_ui import APP
+from framework_callbacks import CallbackCases
 
-INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher']
+INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher']
 
 
-class IntegrationCases(UiFeatureCases):
+class IntegrationCases(CallbackCases):
     def navigation_stacks(self):
         self.r.new_case('stacks-two-nested-destinations')
         self.enter('Stacks')

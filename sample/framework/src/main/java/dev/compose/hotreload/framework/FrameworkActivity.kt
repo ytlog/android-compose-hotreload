@@ -67,6 +67,12 @@ fun FrameworkScreen() {
                         Button(onClick = { nav.navigate("images") }) { Text("Images") }
                         Button(onClick = { nav.navigate("launcher") }) { Text("Launcher") }
                     }
+                    Row {
+                        Button(onClick = { nav.navigate("references") }) { Text("References") }
+                        Button(onClick = { nav.navigate("permissions") }) { Text("Permissions") }
+                    }
+                    Text("Reference lifetime: ${ReferenceAudit.created}:${ReferenceAudit.disposed}", fontSize = 10.sp)
+                    Text("Permission lifetime: ${PermissionAudit.created}:${PermissionAudit.disposed}:${PermissionAudit.deliveries}", fontSize = 10.sp)
                     Text("Image lifetime: ${ImageFixtureAudit.created}:${ImageFixtureAudit.disposed}", fontSize = 10.sp)
                     Text("Launcher lifetime: ${LauncherFixtureAudit.created}:${LauncherFixtureAudit.disposed}:${LauncherFixtureAudit.deliveries}", fontSize = 10.sp)
                     Text("Reactive disposed: ${ReactiveAudit.disposed}", fontSize = 10.sp)
@@ -86,6 +92,8 @@ fun FrameworkScreen() {
             composable("stacks") { StackScreen() }
             composable("images") { ImageScreen() }
             composable("launcher") { LauncherScreen() }
+            composable("references") { ReferenceScreen() }
+            composable("permissions") { PermissionScreen() }
         }
         Text("Ledger: ${FrameworkLedger.events.joinToString(";")}", fontSize = 8.sp, maxLines = 2)
     }

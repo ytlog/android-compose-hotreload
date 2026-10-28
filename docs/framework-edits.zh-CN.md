@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的十六组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images` 或 `compose-launcher` 单组定位，也可以用
+这里的 `all` **只运行本页的十八组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references` 或 `permission-launcher` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -210,6 +210,36 @@ JVM descriptor 匹配 `derivedStateOf` 两个公开重载、`snapshotFlow`、`fl
 lambda 身份指纹忽略精确 Compose 调试调用（`sourceInformation`、`sourceInformationMarkerStart`、
 `traceEventStart`）的最后一个立即字符串常量，避免把字符偏移变化误认成多个回调的业务修改。
 归一化只用于比较指纹，下发方法保留最新源码信息；业务字符串、未知调用、真实歧义与捕获绑定保护不放宽。
+
+## 方法引用、匿名对象与权限 launcher
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-api36 \
+  --art-dcevm-version VERSION --scenario-group method-references permission-launcher
+```
+
+两组继续使用固定应用包和 UI 辅助包，不启用测试输入法。页面由普通 `remember` 持有，
+没有 ViewModel。除了同 PID 和基线 APK 哈希，还核对根页面、页面对象、原接收者、
+方法引用／匿名对象或 launcher／callback 身份，以及业务数据和精确调用次数。
+
+- `method-references`：通过真实按钮事件注册 `receiver::fire` 和 `object : Listener`，
+  再改变接收者草稿。修改目标方法和匿名方法体后调用原对象，分别核对实时接收者数据与
+  注册时捕获的快照；新增捕获字段时，旧匿名对象读取默认 `null`，新建对象读取构造值。
+  GC、HOME／恢复后再次调用原注册；退出释放后重新进入，验证新对象使用最新代码。
+  注册是事件，不是 remember 初始化期间执行工厂；不能由此推断真正初始化依赖变化不重置。
+  本组不覆盖成员签名改变、删改任意捕获字段类型或有歧义的映射。
+- `permission-launcher`：使用真实 `RequestPermission` 请求相机权限，只请求授权，不打开相机。
+  系统弹窗保持打开时修改业务逻辑后点击拒绝；再次申请时修改原结果 callback 后点击
+  “使用应用时允许”。还检查已授权时的同步结果、前后台无重复交付、退出释放与新页面注册。
+  弹窗阶段只允许指定系统权限控制器，继续核对原 PID 和外部物理输入；不伪造 registry 结果。
+  CAMERA 声明在基线 APK 内，不将新增 Manifest 权限算作热更新能力。仅选择本组时，
+  在验收前保存并清理该固定测试包的授权及用户选择标志；监控和主机停止后恢复，保留清理结果。
+  失败退出时关闭明确属于该测试应用的遗留系统权限弹窗，避免其阻挡下一次冷启动。
+  不在同 PID 验收途中用 `pm revoke` 制造拒绝，也不覆盖永久拒绝、权限组、通知、Photo Picker
+  或进程死亡后重投递。
+
+这两组可单独运行。设备通过范围及产物来源以本地记录为准；本地 Compose 修复包与公开 ART
+组合的实测，不代表公开 Compose alpha.2 已包含修复。API 33 暂缓时不补跑其旧组。
 
 ## 图片初始化依赖与后台冻结
 
