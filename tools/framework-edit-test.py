@@ -504,12 +504,14 @@ def main():
     parser.add_argument('--art-dcevm-version',required=True)
     parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
     parser.add_argument('--content-phase', choices=['all', 'settle'], default='all')
+    parser.add_argument('--permission-phase', choices=['all', 'allow'], default='all')
+    parser.add_argument('--delegate-phase', choices=['all', 'addition'], default='all')
     parser.add_argument('--nav-phase', choices=['all', 'back'], default='all')
     parser.add_argument('--form-phase', choices=['all', 'transforms'], default='all')
     parser.add_argument('--feed-phase', choices=['all', 'refresh', 'refresh-finish'], default='all',
                         help='Retry only the remaining RemoteMediator refresh checks')
-    parser.add_argument('--image-phase', choices=['all', 'baseline'], default='all',
-                        help='Isolate image I/O; baseline does not validate hot-edit state retention')
+    parser.add_argument('--image-phase', choices=['all', 'baseline', 'cleanup'], default='all',
+                        help='Use baseline for image I/O or cleanup to retry only disposal after an edit')
     parser.add_argument('--motion-phase', choices=['all', 'animation', 'gestures'], default='all',
                         help='Retry only the pending portion of animation-gestures')
     args=parser.parse_args()

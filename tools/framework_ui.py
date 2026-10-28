@@ -1,5 +1,8 @@
 """Targeted modal, Paging/Pager and in-flight motion edits on ordinary remember state."""
 import json
+import time
+import re
+import xml.etree.ElementTree as ET
 
 UI_GROUPS = ['overlays', 'paging-pager', 'animation-gestures']
 APP = 'dev.compose.hotreload.framework'
@@ -25,14 +28,44 @@ class UiFeatureCases:
         (self.r.case / 'feature-observation.json').write_text(json.dumps({'expected': expected, 'texts': texts}, indent=2))
         return texts
 
+    def scroll_home(self, direction):
+        """Expose fixture controls/audits on phones without changing display settings."""
+        previous = None
+        for _ in range(4):
+            xml = self.d.adb('exec-out', 'uiautomator', 'dump', '/dev/tty')
+            nodes = list(ET.fromstring(xml).iter('node'))
+            texts = tuple(n.get('text', '') for n in nodes)
+            assert 'Route: list' in texts, 'Home scroll outside fixture list'
+            if texts == previous:
+                return
+            previous = texts
+            scrolls = [n for n in nodes if n.get('class') == 'android.widget.ScrollView'
+                       and n.get('package') == APP]
+            assert len(scrolls) == 1, 'Fixture home scroll container is ambiguous'
+            x1, y1, x2, y2 = map(int, re.findall(r'\d+', scrolls[0].get('bounds', '')))
+            top, bottom = y1 + 40, y2 - 40
+            assert bottom > top + 100, 'Fixture list has no usable scroll area'
+            x = (x1 + x2) // 2
+            start, end = (top, bottom) if direction == 'top' else (bottom, top)
+            self.d.adb('shell', 'input', 'swipe', str(x), str(start), str(x), str(end), '350')
+            time.sleep(.4)
+
     def enter(self, label):
-        self.d.wait_for(lambda ts: 'Draft list' in ts, 'fixture list')
+        self.d.wait_for(lambda ts: 'Route: list' in ts, 'fixture list')
+        self.scroll_home('top')
         self.root = self.get(self.r.snapshot(), 'Root: ')
-        self.d.tap_text(label)
+        if label not in self.d.texts():
+            self.scroll_home('bottom')
+        matches = [bounds for text, bounds in self.d.nodes() if text == label]
+        assert len(matches) == 1, 'Fixture entry not uniquely visible: ' + label
+        x1, y1, x2, y2 = matches[0]
+        self.d.adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+        time.sleep(.5)
 
     def leave(self):
         self.d.tap_text('Back')
-        self.wait('Draft list', 'Root: ' + self.root)
+        self.wait('Route: list', 'Root: ' + self.root)
+        self.scroll_home('bottom')
 
     def edit(self, name, filename, old, new):
         self.r.edit(filename, old, new)

@@ -1,5 +1,6 @@
 """Real AndroidView callbacks and Android Activity result delivery; no synthetic registry dispatch."""
 import json
+from framework_ui import UiFeatureCases
 
 INTEROP_GROUPS = ['androidview', 'native-listener', 'activity-result']
 
@@ -64,12 +65,14 @@ class InteropCases:
 
     def start(self):
         self.r.new_case('interop-startup')
+        UiFeatureCases(self.r).scroll_home('top')
         texts = self.d.wait_for(lambda t: 'Draft list' in t, 'fixture list')
         self.root = self.get(texts, 'Root: ')
         self.enter()
         self.r.passed('interop-startup')
 
     def enter(self):
+        UiFeatureCases(self.r).scroll_home('top')
         self.d.tap_text('Open interop')
         texts = self.d.wait_for(lambda t: 'Native anchors: true' in t, 'native View factory')
         identity = self.get(texts, 'Interop: ')
@@ -85,7 +88,9 @@ class InteropCases:
     def leave(self):
         self.d.tap_text('Back')
         self.audit[1] += 1; self.audit[3] += 1
-        texts = self.d.wait_for(lambda t: 'Draft list' in t and self.audit_text() in t,
+        self.d.wait_for(lambda t: 'Route: list' in t, 'fixture list')
+        UiFeatureCases(self.r).scroll_home('bottom')
+        texts = self.d.wait_for(lambda t: self.audit_text() in t,
                                'one release/unregister and detached native callbacks suppressed')
         assert 'Root: ' + self.root in texts
         self.r.snapshot()

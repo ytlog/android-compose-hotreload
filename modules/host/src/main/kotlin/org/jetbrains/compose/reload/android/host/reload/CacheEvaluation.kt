@@ -15,6 +15,7 @@ internal class CacheEvaluation(
     private val dirtyFields: Set<FieldId>,
     private val declarations: (ClassId) -> Set<MethodId>? = { null },
     private val typesMayOverlap: (ClassId, ClassId) -> Boolean = { _, _ -> true },
+    private val compatibleConstructors: Set<MethodId> = emptySet(),
 ) {
     private val after = current.classIndex + pending.classIndex
     private val methods = after.values.flatMap { it.methods.entries }.associate { it.toPair() }
@@ -166,8 +167,12 @@ internal class CacheEvaluation(
                 continue
             }
             if (!visited.add(call)) continue
-            if (before == null || next == null || shape(before.rootScope) != shape(next.rootScope)) return path()
-            for (scope in listOf(before.rootScope, next.rootScope)) {
+            if (before == null || next == null ||
+                (id !in compatibleConstructors && shape(before.rootScope) != shape(next.rootScope))) return path()
+            // The only removed execution is a proven constant delegate store. Continue tracing every
+            // original call/field, so a simultaneous change to an existing initializer still resets.
+            val scopes = if (id in compatibleConstructors) listOf(before.rootScope) else listOf(before.rootScope, next.rootScope)
+            for (scope in scopes) {
                 val code = scope.extras[MethodExecutionCode]
                 if (code == null || !code.known) {
                     if (id in dirtyMethods) return path()

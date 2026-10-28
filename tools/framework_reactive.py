@@ -1,5 +1,6 @@
 """Snapshot and lifecycle behavior on a retained ordinary remember page."""
 import json
+from framework_ui import UiFeatureCases
 import re
 
 REACTIVE_GROUPS = ['snapshot-flow', 'derived-state', 'lifecycle-flow']
@@ -44,12 +45,14 @@ class ReactiveCases:
 
     def start(self):
         self.r.new_case('reactive-startup')
+        UiFeatureCases(self.r).scroll_home('top')
         texts = self.d.wait_for(lambda ts: 'Draft list' in ts, 'fixture list')
         self.root = self.get(texts, 'Root: ')
         self.enter()
         self.r.passed('reactive-startup')
 
     def enter(self):
+        UiFeatureCases(self.r).scroll_home('top')
         self.d.tap_text('Open reactive')
         texts = self.d.wait_for(lambda ts: any(t.startswith('Reactive: ') for t in ts), 'reactive page')
         identity = self.get(texts, 'Reactive: ')
@@ -195,7 +198,9 @@ class ReactiveCases:
 
     def leave(self):
         self.d.tap_text('Back'); self.disposed += 1
-        self.d.wait_for(lambda ts: 'Draft list' in ts and f'Reactive disposed: {self.disposed}' in ts,
+        self.d.wait_for(lambda ts: 'Route: list' in ts, 'fixture list')
+        UiFeatureCases(self.r).scroll_home('bottom')
+        self.d.wait_for(lambda ts: f'Reactive disposed: {self.disposed}' in ts,
                         'reactive page disposal')
         self.stops += 1; self.stopped()
         self.r.wait(lambda: f'{self.identity}:snapshot-stop:1' in

@@ -9,11 +9,12 @@ from framework_callbacks import CallbackCases
 from framework_stateful import StatefulCases
 from framework_daily import DailyCases
 from framework_visual import VisualCases
+from framework_evolution import EvolutionCases
 
-INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher', 'remote-feed', 'long-session', 'search-races', 'state-form', 'nested-scroll', 'custom-drawing', 'navigation-extensions', 'content-transitions']
+INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher', 'remote-feed', 'long-session', 'search-races', 'state-form', 'nested-scroll', 'custom-drawing', 'navigation-extensions', 'content-transitions', 'delegate-state', 'scoped-layout']
 
 
-class IntegrationCases(CallbackCases, StatefulCases, DailyCases, VisualCases):
+class IntegrationCases(CallbackCases, StatefulCases, DailyCases, VisualCases, EvolutionCases):
     def navigation_stacks(self):
         self.r.new_case('stacks-two-nested-destinations')
         self.enter('Stacks')
@@ -58,6 +59,8 @@ class IntegrationCases(CallbackCases, StatefulCases, DailyCases, VisualCases):
         self.leave(); self.r.passed('stacks-independent-pop-and-home-state')
 
     def async_images(self):
+        if getattr(self.r.args, 'image_phase', 'all') == 'cleanup':
+            return self.image_cleanup()
         if getattr(self.r.args, 'image_phase', 'all') == 'baseline':
             return self.image_baseline()
         self.r.new_case('images-real-http-pending')
@@ -97,6 +100,19 @@ class IntegrationCases(CallbackCases, StatefulCases, DailyCases, VisualCases):
         self.r.new_case('images-dispose-loader-and-server-once')
         self.leave(); self.wait('Image lifetime: 1:1')
         self.r.passed('images-dispose-loader-and-server-once')
+
+    def image_cleanup(self):
+        """Retry only disposal after one hot edit; reuse prior image callback/cache checks."""
+        self.r.new_case('images-cleanup-prerequisite')
+        self.enter('Images'); self.d.tap_text('Edit image draft')
+        self.wait('Image counts: 0:0:1:0:true')
+        anchor = 'Image anchor: ' + self.get(self.r.snapshot(), 'Image anchor: ')
+        self.edit('images-dispose-after-edit-only', 'IntegrationLogic.kt', 'image-v1:', 'image-cleanup:')
+        self.wait(anchor, 'Image draft: edited-image-draft')
+        self.d.tap_text('Release image')
+        self.wait(anchor, 'Image counts: 1:0:1:1:false')
+        self.leave(); self.wait('Image lifetime: 1:1')
+        self.r.passed('images-dispose-after-edit-only', reload=True)
 
     def image_baseline(self):
         """Isolate real image I/O from the known public-version cache-invalidation failure."""

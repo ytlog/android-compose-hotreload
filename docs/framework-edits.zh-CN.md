@@ -15,10 +15,11 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的二十六组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed`、`long-session`、`search-races`、`state-form`、`nested-scroll`、`custom-drawing`、`navigation-extensions` 或 `content-transitions` 单组定位，也可以用
+这里的 `all` **只运行本页的二十八组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed`、`long-session`、`search-races`、`state-form`、`nested-scroll`、`custom-drawing`、`navigation-extensions` 、`content-transitions`、`delegate-state` 或 `scoped-layout` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
+测试首页可滚动；手机上先滚动到入口，退出后滚动到释放统计，不修改设备分辨率或密度。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
 本地 upstream Maven 产物；每台设备内部仍串行执行。
 
@@ -119,6 +120,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
 调整为 Effect 启动服务、具体 client 与不可变 requestMode 后，API 36 仍实测重置，主机原因
 指向 `OkHttpClient.Builder.<init>`。仅分析项目类的诊断无法排除完整依赖类路径中的初始化传播。
 这两份失败均保留，不能用调整夹具或基础图片加载通过结果代替状态保留验证。
+
+`--image-phase cleanup` 只建立图片请求并做一次必要热更新，然后检查退出释放；可复用此前已通过的图片业务／回调／缓存结果，但不能单独代表完整图片组通过。
 
 `--image-phase baseline` 仅运行真实 HTTP／PNG、内存缓存、503／重试及退出清理，不执行热更新，
 用于区分图片管线自身问题和初始化失效问题。默认 `all` 保留热更新后对象／草稿不变的严格断言；
@@ -235,6 +238,7 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   CAMERA 声明在基线 APK 内，不将新增 Manifest 权限算作热更新能力。仅选择本组时，
   在验收前保存并清理该固定测试包的授权及用户选择标志；监控和主机停止后恢复，保留清理结果。
   失败退出时关闭明确属于该测试应用的遗留系统权限弹窗，避免其阻挡下一次冷启动。
+  `--permission-phase allow` 仅补允许回调、避免重复投递与重新注册；先建立一次拒绝作为前置状态，不重跑已通过的拒绝热更新检查，也不能单独代表完整组通过。
   不在同 PID 验收途中用 `pm revoke` 制造拒绝，也不覆盖永久拒绝、权限组、通知、Photo Picker
   或进程死亡后重投递。
 
@@ -404,3 +408,33 @@ Navigation 3 固定为 1.0.0；新的 Activity 和深链过滤器在基线 APK �
   `--content-phase settle` 只建立必要的新旧内容状态并补完成／可见性检查，跳过已通过的
   内容显示和子项回调热更新；完整流程仍应使用默认 `all`。这里只改兼容方法体，
   不外推共享元素、任意 contentKey 或状态机结构迁移。
+
+
+## 有界状态演进：新增委托与子区域状态槽
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-api36 \
+  --art-dcevm-version VERSION --scenario-group delegate-state scoped-layout
+```
+
+这两组验证当前源码实现，不将旧公开版本的结果改写成修复版通过。版本、APK／AAR 哈希、
+设备结果和失败记录另存本地验证记录；包名仍为 `dev.compose.hotreload.framework`。
+
+- `delegate-state`：普通 `remember` 持有业务对象，先修改原文本和计数，再新增常量初始化的
+  `mutableStateOf`、Int／Long／Float／Double 状态和 nullable 状态。先将同批更新置于
+  ART 拒绝条件下，核对原对象与原字段未变，再恢复并读取新增属性；之后修改新增属性、
+  再次编辑方法体，检查页面／对象／原委托身份、用户值和构造次数。新建对象仍执行正常
+  构造流程，前后台／GC 后原值保持，退出释放一次。`--delegate-phase addition` 仅用于
+  定位新增属性读取，跳过批次拒绝前置检查，不能代替完整组验收。
+- `scoped-layout`：父层持有普通 remember 草稿和身份，兄弟区域另有状态。在已存在的
+  条件子区域新增 remember 与显示节点，要求只重置改变槽布局的子区域，父层草稿、
+  父层／兄弟身份与计数保持。随后编辑显示辅助函数、经过前后台／GC，并检查退出释放。
+
+新增委托仅允许可静态证明的标量／null 常量、Compose 标准状态工厂与标准 mutation policy。
+首次读取缺失委托时在原对象上初始化一次，保留原 GETFIELD 与已存在委托；不重放构造器、
+应用初始化函数或任意副作用。依赖其他字段／参数／函数的初始化仍不能自动推导；
+既有委托泛型改型也不自动迁移旧值。构造器中原有依赖同时变化时仍需使相关缓存失效。
+
+父层保留要求可比较的父层指令、完整缓存元数据和可区分的子组边界。父层自身缓存变化、
+边界不明、共享编译器 remember key 或跨区域控制流不满足条件时保留原重置策略。
+这是缩小重置范围，不是任意 Compose 槽迁移；改变布局的子区域状态不承诺保留。

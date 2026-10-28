@@ -2,7 +2,7 @@
 """Continuous Kotlin -> D8 -> live Compose edits, restoring sources on exit.
 
 python3 tools/real-edit-test.py --serial DEVICE --device-id local-apiNN \
-    --art-dcevm-version VERSION [--scenario-group startup|business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|coroutines|coroutines-recovery|repositories|repositories-interface|full]
+    --art-dcevm-version VERSION [--scenario-group startup|business|rendering|callbacks|recovery|compose-state|compose-recovery|refactoring|properties|properties-lazy|properties-delegates|coroutines|coroutines-recovery|repositories|repositories-interface|full]
 Raw output stays in ignored build/evidence/. No reinstall or restart between edits.
 """
 import argparse
@@ -21,6 +21,7 @@ import zipfile
 from types import SimpleNamespace
 from device_session import DeviceSession
 from ui_driver import UiDriver
+from ime_driver import ImeDriver
 from development_scenarios import DevelopmentCases, DEVELOPMENT_SOURCES, GENERATED_SOURCES
 from property_scenarios import PropertyCases, PROPERTY_SOURCES
 from coroutine_scenarios import CoroutineCases, COROUTINE_SOURCES
@@ -47,9 +48,12 @@ def main():
     parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL'))
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--art-dcevm-version', required=True)
-    parser.add_argument('--scenario-group', choices=['startup', 'business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session', 'integration', 'full'], default='full')
+    parser.add_argument('--scenario-group', choices=['startup', 'business', 'rendering', 'callbacks', 'recovery', 'compose-state', 'compose-recovery', 'refactoring', 'properties', 'properties-lazy', 'properties-delegates', 'coroutines', 'coroutines-recovery', 'repositories', 'repositories-interface', 'effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session', 'integration', 'full'], default='full')
     parser.add_argument('--integration-groups', nargs='+', choices=['effects', 'scopes', 'lifecycle', 'network', 'build', 'transaction', 'session'])
+    parser.add_argument('--verification-ime', action='store_true', help='Use the fixed test IME for deterministic property input (API 33+)')
     args = parser.parse_args()
+    if args.verification_ime and not args.scenario_group.startswith('properties'):
+        parser.error('--verification-ime currently requires a properties group')
     if args.integration_groups and args.scenario_group != 'integration':
         parser.error('--integration-groups requires --scenario-group integration')
     if not args.serial:
@@ -236,7 +240,7 @@ def main():
     active_invariant = invariant
     development_only = args.scenario_group in ['compose-state', 'compose-recovery', 'refactoring']
     state_activity = APP + '/.StateEditActivity'
-    property_only = args.scenario_group in ['properties', 'properties-lazy']
+    property_only = args.scenario_group in ['properties', 'properties-lazy', 'properties-delegates']
     property_activity = APP + '/.PropertyEditActivity'
     coroutine_only = args.scenario_group in ['coroutines', 'coroutines-recovery']
     coroutine_activity = APP + '/.CoroutineEditActivity'
@@ -248,15 +252,19 @@ def main():
     context = SimpleNamespace(device=device, evidence=evidence, source=SOURCE, snapshot=snapshot,
                               accepted=accepted, trigger=trigger, common=common, new_case=new_case,
                               case_dir=lambda: case_dir, results=results, app_pid=lambda: app_pid,
-                              value=value, edit=regression.edit, integration_groups=args.integration_groups)
+                              value=value, edit=regression.edit, integration_groups=args.integration_groups,
+                              enter_text=lambda text: ime.command('commit', text) if ime else device.adb('shell', 'input', 'text', text))
     development = None
     session = DeviceSession(device, evidence, APP)
     ui_driver = UiDriver(device, evidence)
+    ime = ImeDriver(device, evidence) if args.verification_ime else None
     run_log = (evidence / 'hotRun.log').open('w')
     try:
         device.adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP')
         device.adb('shell', 'wm', 'dismiss-keyguard')
         ui_driver.start()
+        if ime:
+            ime.start()
         session.start()
         with (evidence / 'prepare-probe.log').open('w') as log:
             subprocess.run([str(ROOT / 'gradlew'), ':hot-reload-android-host:prepareWorkflowProbe', '--console=plain'],
@@ -450,7 +458,7 @@ def main():
                       'fun processEdit(input: String): String = EditFormatter().format(input) + ":" + ')],
                      action=lambda: apply('new-class:draft42:recovered:' + (
                          'business-v2:24tfard' if group == 'full' else 'business-v1:draft42')))
-        if group in ['properties', 'properties-lazy', 'full']:
+        if group in ['properties', 'properties-lazy', 'properties-delegates', 'full']:
             if not property_only:
                 current_activity = property_activity
                 device.adb('shell', 'am', 'start', '-W', '-n', current_activity)
@@ -460,6 +468,8 @@ def main():
                 properties.start()
             if group == 'properties-lazy':
                 properties.run_lazy()
+            elif group == 'properties-delegates':
+                properties.run_delegates()
             else:
                 properties.run()
         if group in ['coroutines', 'coroutines-recovery', 'full']:
@@ -531,6 +541,11 @@ def main():
         except Exception as error:
             results.append({'name': 'session-cleanup', 'result': 'FAIL', 'error': type(error).__name__})
             (evidence / 'session-cleanup-failure.txt').write_text(str(error))
+        try:
+            if ime:
+                ime.close()
+        except Exception as error:
+            results.append(dict(name="ime-cleanup", result="FAIL", error=type(error).__name__))
         try:
             ui_driver.close()
         except Exception as error:

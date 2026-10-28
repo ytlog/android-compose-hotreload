@@ -15,7 +15,9 @@ public final class VerificationIme extends InputMethodService {
         @Override public void onReceive(Context context, Intent intent) {
             EditorInfo editor = getCurrentInputEditorInfo();
             InputConnection connection = getCurrentInputConnection();
-            if (connection == null || editor == null || !"dev.compose.hotreload.framework".equals(editor.packageName)) {
+            if (connection == null || editor == null ||
+                    !("dev.compose.hotreload.framework".equals(editor.packageName) ||
+                      "dev.compose.hotreload.sample".equals(editor.packageName))) {
                 setResultCode(2); setResultData("wrong-editor"); return;
             }
             String command = intent.getStringExtra("command");

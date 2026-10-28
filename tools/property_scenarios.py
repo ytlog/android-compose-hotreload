@@ -68,7 +68,7 @@ class PropertyCases:
         assert field, 'Missing property draft input'
         x1, y1, x2, y2 = map(int, field.groups())
         self.d.adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
-        self.d.adb('shell', 'input', 'text', 'property42')
+        self.c.enter_text('property42')
         self.d.tap_text('Seed models')
         texts = self.d.wait_for(lambda ts: 'Property draft: property42' in ts, 'property input')
         self.identities = {p: self.c.value(texts, p) for p in ['Property state: ', 'Property remember: ']}
@@ -90,9 +90,34 @@ class PropertyCases:
             (delegates, 'coldRuns++; "cold-v1"', 'coldRuns++; "cold-v2"'),
             (delegates, '$warm|pending|', '$warm|$cold|')], action=self.inspect)
 
+    def run_delegates(self):
+        delegates = SOURCE / 'PropertyDelegates.kt'
+        def accept(name, edits):
+            self.c.accepted(name, edits, action=self.inspect)
+
+        self.new_delegate = 'delegate-v2'
+        accept('property-delegate-initializer', [(delegates, 'mutableStateOf("delegate-v1")', 'mutableStateOf("delegate-v2")')])
+        self.run_lazy()
+        self.old_added = self.new_added = 'added-delegate'
+        accept('property-add-delegate', [(delegates, '// ADDED_DELEGATE', 'var added: String by mutableStateOf("added-delegate")'),
+            (delegates, 'fun addedValue(): String = "absent"',
+             'fun addedValue(): String = try { added } catch (failure: NullPointerException) { "NullPointerException" }')])
+        self.old_delegate, self.new_delegate = 'ClassCastException', '17'
+        accept('property-delegate-generic-retype', [
+            (delegates, 'var value: String by mutableStateOf("delegate-v2")', 'var value: Int by mutableStateOf(17)'),
+            (delegates, 'value = "delegate-edited"', 'value = 42'),
+            (delegates, 'value = "migrated"', 'value = 29')])
+        self.abi('PropertyDelegates', ['androidx.compose.runtime.MutableState value$delegate;', 'int getValue();'])
+        self.c.new_case('property-explicit-delegate-migration')
+        self.d.tap_text('Migrate delegate')
+        self.old_delegate = '29'
+        self.inspect()
+        self.c.common()
+        self.c.results.append(dict(name='property-explicit-delegate-migration', result='PASS', applicationMigration=True))
+
     def run(self):
         models = [SOURCE / 'PropertyViewModel.kt', SOURCE / 'PropertyBusiness.kt']
-        delegates, data, probe = (SOURCE / p for p in ['PropertyDelegates.kt', 'PropertyData.kt', 'PropertyProbe.kt'])
+        data, probe = (SOURCE / p for p in ['PropertyData.kt', 'PropertyProbe.kt'])
         def both(old, new):
             return [(p, old, new) for p in models]
         def accept(name, edits):
@@ -118,25 +143,7 @@ class PropertyCases:
         self.old['reference'], self.fresh['reference'] = 'null', '99'
         accept('property-incompatible-reference', both('var reference: CharSequence? = "reference-v2"', 'var reference: Number? = 99') +
                both('reference = StringBuilder("retained-ref")', 'reference = 89'))
-        self.new_delegate = 'delegate-v2'
-        accept('property-delegate-initializer', [(delegates, 'mutableStateOf("delegate-v1")', 'mutableStateOf("delegate-v2")')])
-        self.run_lazy()
-        self.old_added, self.new_added = 'NullPointerException', 'added-delegate'
-        accept('property-add-delegate', [(delegates, '// ADDED_DELEGATE', 'var added: String by mutableStateOf("added-delegate")'),
-            (delegates, 'fun addedValue(): String = "absent"',
-             'fun addedValue(): String = try { added } catch (failure: NullPointerException) { "NullPointerException" }')])
-        self.old_delegate, self.new_delegate = 'ClassCastException', '17'
-        accept('property-delegate-generic-retype', [
-            (delegates, 'var value: String by mutableStateOf("delegate-v2")', 'var value: Int by mutableStateOf(17)'),
-            (delegates, 'value = "delegate-edited"', 'value = 42'),
-            (delegates, 'value = "migrated"', 'value = 29')])
-        self.abi('PropertyDelegates', ['androidx.compose.runtime.MutableState value$delegate;', 'int getValue();'])
-        self.c.new_case('property-explicit-delegate-migration')
-        self.d.tap_text('Migrate delegate')
-        self.old_delegate = '29'
-        self.inspect()
-        self.c.common()
-        self.c.results.append(dict(name='property-explicit-delegate-migration', result='PASS', applicationMigration=True))
+        self.run_delegates()
         self.data_old.update(tag='null', rank=0)
         self.data_new.update(tag='tag-v2', rank=9)
         accept('property-data-additions', [

@@ -25,7 +25,7 @@ class ComposeInvalidationTest {
                     factory: Boolean = false, invoke: Boolean = false, eager: Boolean = false,
                     classLambda: Boolean = false, library: Boolean = false, initializer: String? = null,
                     nullCallback: Boolean = false, stringifyCallback: Boolean = false,
-                    exactFactory: Boolean = false,
+                    exactFactory: Boolean = false, annotated: Boolean = false, debugSuffix: String = "",
                     lazyApi: MethodId? = null, readWrapper: Boolean = false,
                     callbackType: String = "java/util/function/Supplier", callbackMethod: String = "get",
                     callbackArgs: String = "") =
@@ -39,6 +39,9 @@ class ComposeInvalidationTest {
                     visitInsn(RETURN); visitMaxs(0, 0); visitEnd()
                 }
                 visitMethod(ACC_PUBLIC or ACC_STATIC, "Screen", "(Landroidx/compose/runtime/Composer;)V", null, null).apply {
+                    if (annotated) visitAnnotation("Landroidx/compose/runtime/internal/FunctionKeyMeta;", false).apply {
+                        visit("key", 100); visitEnd()
+                    }
                     visitCode()
                     fun start(key: Int) {
                         visitVarInsn(ALOAD, 0)
@@ -94,7 +97,7 @@ class ComposeInvalidationTest {
                         visitLabel(cacheEnd)
                         if (debug) {
                             visitLocalVariable("\$i\$f\$cache", "I", null, cacheStart, cacheEnd, 1)
-                            visitLocalVariable("\$i\$a\$-cache-test", "I", null, calculationStart, calculationEnd, 2)
+                            visitLocalVariable("\$i\$a\$-cache-test$debugSuffix", "I", null, calculationStart, calculationEnd, 2)
                         }
                     }
                     visitLdcInsn(text)
@@ -176,6 +179,27 @@ class ComposeInvalidationTest {
                 visitEnd()
             }.toByteArray())))
         }
+
+    @Test fun `compiler function metadata shares its real restart group boundary`() {
+        val before = app(cache = true, annotated = true)
+        val after = app(cache = true, annotated = true, childKey = 201)
+        val result = composeInvalidation(before, after, after.groupIndex.values.flatten())
+        assertContentEquals(intArrayOf(200, 201), result.reset.sortedArray())
+        assertContentEquals(intArrayOf(100), result.recompose)
+        val changed = app(cache = true, annotated = true, childKey = 201, helper = "changed")
+        assertTrue(100 in composeInvalidation(before, changed, changed.groupIndex.values.flatten()).reset)
+    }
+
+    @Test fun `debug-only changes preserve leaf and parent independently of dirty scope order`() {
+        val before = app(cache = true, annotated = true)
+        val after = app(cache = true, annotated = true, debugSuffix = "-new-source-offset")
+        val scopes = after.groupIndex.values.flatten()
+        for (order in listOf(scopes, scopes.reversed())) {
+            val result = composeInvalidation(before, after, order)
+            assertContentEquals(intArrayOf(), result.reset)
+            assertContentEquals(intArrayOf(100, 200), result.recompose.sortedArray())
+        }
+    }
 
     private data class LazyApi(val method: MethodId, val arity: Int)
     private val lazyApis = listOf(
@@ -389,12 +413,36 @@ class ComposeInvalidationTest {
     }
 
     @Test
-    fun `nested slot structure changes also reset the parent`() {
+    fun `isolated child key replacement resets children and preserves the unchanged parent`() {
         val before = app()
         val after = app(childKey = 201)
         val plan = composeInvalidation(before, after, before.groupIndex.values.flatten() + after.groupIndex.values.flatten())
-        assertContentEquals(intArrayOf(100, 200, 201).sortedArray(), plan.reset.sortedArray())
-        assertContentEquals(intArrayOf(), plan.recompose)
+        assertContentEquals(intArrayOf(200, 201).sortedArray(), plan.reset.sortedArray())
+        assertContentEquals(intArrayOf(100), plan.recompose)
+    }
+
+    @Test
+    fun `parent cache survives isolated child replacement but changed executed initialization does not`() {
+        val before = app(cache = true)
+        val after = app(cache = true, childKey = 201)
+        val dirty = before.groupIndex.values.flatten() + after.groupIndex.values.flatten()
+        assertContentEquals(intArrayOf(100), composeInvalidation(before, after, dirty).recompose)
+        val changedInitializer = app(cache = true, childKey = 201, helper = "new-initializer")
+        val changed = changedInitializer.groupIndex.values.flatten() + changedInitializer.methodIndex.values.map { it.rootScope }
+        assertTrue(100 in composeInvalidation(before, changedInitializer, changed).reset)
+    }
+
+    @Test
+    fun `missing metadata and nonunique compiler remember boundaries never isolate a reset`() {
+        for (child in listOf(100, 1849434622, 5004770, -1633490746, -1746271574, -1224400529)) {
+            val before = app(cache = true, childKey = child)
+            val after = app(cache = true, childKey = 201)
+            val dirty = before.groupIndex.values.flatten() + after.groupIndex.values.flatten()
+            assertTrue(100 in composeInvalidation(before, after, dirty).reset, "child=$child")
+        }
+        val before = app(cache = true, debug = false)
+        val after = app(cache = true, debug = false, childKey = 201)
+        assertTrue(100 in composeInvalidation(before, after, before.groupIndex.values.flatten() + after.groupIndex.values.flatten()).reset)
     }
 
     @Test

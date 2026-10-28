@@ -172,12 +172,18 @@ class CallbackCases(UiFeatureCases):
         self.wait('Permission state: edited-permission-draft:0:0', 'Permission granted: false')
         anchor = 'Permission anchor: ' + self.get(self.r.snapshot(), 'Permission anchor: ')
         self.request_permission()
-        self.r.passed('permission-real-system-request')
-        self.edit('permission-denied-after-pending-business-edit', 'PermissionLogic.kt', 'permission-v1:', 'permission-v2:')
-        self.permission_answer('permission_deny_button')
-        self.wait(anchor, 'Permission state: edited-permission-draft:1:1',
-                  'Permission result: permission-v2:false:edited-permission-draft', 'Permission granted: false')
-        self.r.passed('permission-denied-after-pending-business-edit', reload=True)
+        if getattr(self.r.args, 'permission_phase', 'all') == 'allow':
+            # Re-establish one prior denial without rerunning its accepted hot-edit check.
+            self.permission_answer('permission_deny_button')
+            self.wait(anchor, 'Permission state: edited-permission-draft:1:1', 'Permission granted: false')
+            self.r.edit('PermissionLogic.kt', 'permission-v1:', 'permission-v2:')
+        else:
+            self.r.passed('permission-real-system-request')
+            self.edit('permission-denied-after-pending-business-edit', 'PermissionLogic.kt', 'permission-v1:', 'permission-v2:')
+            self.permission_answer('permission_deny_button')
+            self.wait(anchor, 'Permission state: edited-permission-draft:1:1',
+                      'Permission result: permission-v2:false:edited-permission-draft', 'Permission granted: false')
+            self.r.passed('permission-denied-after-pending-business-edit', reload=True)
         self.r.new_case('permission-repeat-system-request')
         self.request_permission()
         self.edit('permission-original-callback-after-pending-edit', 'PermissionScreen.kt', 'calls += 1', 'calls += 3')

@@ -103,7 +103,7 @@ Kotlin 按源码顺序给编译器生成的方法编号。插入 lambda 会改�
 | CharSequence? 改 Number? | 不兼容值清为 null | 使用新 Number 初始值 |
 | 修改 lazy 初始化 lambda | 已求值的旧 lazy 保留缓存；未求值的旧 lazy 首次访问执行更新后的方法体；各实例计数各一次 | 首次访问执行新初始化代码 |
 | 修改既有 mutableStateOf 初始值 | 保留旧 delegate 和用户写入值 | 创建带新初值的 delegate |
-| 新增委托属性 | backing delegate 为 null，getter 抛 NPE | 创建 delegate，getter 可调用 |
+| 新增常量 Compose 状态委托 | 当前实现首次读取时补齐缺失 delegate；保留原对象，不重跑构造器 | 创建 delegate，getter 可调用 |
 | 委托 String 改 Int | MutableState backing 字段 JVM 类型未变，旧 String 留存；getter 抛 CCE | 新 delegate 存储 Int |
 | 应用显式调用委托 setter 迁移 | 设置 Int 后 getter 正常；这一步由页面按钮触发 | 不受影响 |
 | data class 新增主构造参数 | 新字段为 null／0；不重跑主构造器 | 使用新默认参数 |
@@ -112,7 +112,9 @@ Kotlin 按源码顺序给编译器生成的方法编号。插入 lambda 会改�
 
 每步检查 data class 的真实 `componentN`、`copy()`／`copy$default`、`equals`、`hashCode`、`toString`。`copy()` 创建新对象，但默认参数取接收者当前字段，而不是声明的新默认值；检查副本不同身份、相同字段及相等／哈希一致，新建默认对象与旧对象不相等。代表性阶段保存并核对真实 ClassFile 描述符，包括委托泛型改型后 backing 字段擦除不变。
 
-缺失 delegate 与类型擦除导致的异常是明确暴露的使用边界，不计作“旧属性可正常使用”，也不通过自动运行构造器修复。旧对象初始化迁移需应用显式定义；本组只演示已存在 delegate 的 setter 迁移，不替新增 delegate 推算历史初值。
+当前实现仅自动补齐可静态证明的常量 Compose 状态委托，不推算依赖其他字段、参数或应用函数的历史初值。未识别的缺失 delegate 与类型擦除异常仍是使用边界，不计作成功调用；不重跑构造器。既有 delegate 的改型通过页面 setter 显式迁移。可用 `--scenario-group properties-delegates` 只补验初值编辑、lazy、新增委托、泛型改型及显式迁移，设备通过范围以本地记录为准。
+API 33 及以上的属性组可加 `--verification-ime`，复用固定包名的验证输入法输入草稿，避免系统候选词替换；退出时恢复原输入法。
+
 
 非法活对象改 abstract 的批次同时包含待新增属性。拒绝后继续真实调用旧 getter、创建旧定义的新对象并核对计数；修正后在同一进程提交，新属性仅在新对象执行初始化。各步请求 GC、切换前后台并保留输入、引用锚点及独立 remember 标识。开发期执行 `--scenario-group properties`；`properties-lazy` 单独定位已求值／未求值 lazy；冻结后纳入 `full`。结果以本地验证记录与逐次报告为准。
 

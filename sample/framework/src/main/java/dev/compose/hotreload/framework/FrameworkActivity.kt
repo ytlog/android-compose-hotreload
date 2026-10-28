@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,7 +54,7 @@ fun FrameworkScreen() {
             enterTransition = { EnterTransition.None }, exitTransition = { ExitTransition.None },
             popEnterTransition = { EnterTransition.None }, popExitTransition = { ExitTransition.None }) {
             composable("list") {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text("Draft list")
                     Button(onClick = { nav.navigate("detail/42") }) { Text("Open 42") }
                     Button(onClick = { nav.navigate("detail/43") }) { Text("Open 43") }
@@ -86,7 +88,13 @@ fun FrameworkScreen() {
                         Button(onClick = { context.startActivity(android.content.Intent(context, NavExtensionActivity::class.java)) }) { Text("Nav extensions") }
                         Button(onClick = { nav.navigate("content") }) { Text("Content motion") }
                     }
+                    Row {
+                        Button(onClick = { nav.navigate("delegates") }) { Text("Delegates") }
+                        Button(onClick = { nav.navigate("scoped-layout") }) { Text("Scoped layout") }
+                    }
                     Text("Draw lifetime: ${DrawAudit.created}:${DrawAudit.disposed}:${DrawAudit.attached}:${DrawAudit.detached}", fontSize = 10.sp)
+                    Text("Delegate lifetime: ${DelegateAudit.pages}:${DelegateAudit.disposed}", fontSize = 10.sp)
+                    Text("Layout lifetime: ${ScopedLayoutAudit.parents}:${ScopedLayoutAudit.removed}", fontSize = 10.sp)
                     Text("Nav extension lifetime: ${NavExtensionAudit.created}:${NavExtensionAudit.disposed}", fontSize = 10.sp)
                     Text("Content cleanup: ${ContentAudit.children}:${ContentAudit.removed}:${ContentAudit.visibleCreated}:${ContentAudit.visibleRemoved}", fontSize = 10.sp)
                     Text("Content page lifetime: ${ContentAudit.pages}:${ContentAudit.disposed}", fontSize = 10.sp)
@@ -122,6 +130,8 @@ fun FrameworkScreen() {
             composable("scroll") { ScrollScreen() }
             composable("drawing") { DrawScreen() }
             composable("content") { ContentScreen() }
+            composable("delegates") { DelegateScreen() }
+            composable("scoped-layout") { ScopedLayoutScreen() }
             composable("search") { SearchScreen() }
             composable("long-session") { LongSessionScreen() }
             composable("remote-feed") { RemoteFeedScreen() }

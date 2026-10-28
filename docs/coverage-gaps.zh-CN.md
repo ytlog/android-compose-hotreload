@@ -15,7 +15,7 @@
 | 保留输入、详情选择，修改业务判断、返回值、辅助方法 | `business`；同 PID、ViewModel、操作计数和独立 remember | 不承诺改动任意状态作用域后槽位仍保留 |
 | 修改已经注册的 lambda，插入另一个 lambda，调整捕获 | `callbacks`；原监听器与新建对照分别调用，引用锚点及注册次数不变 | 新捕获在旧回调中为 null／0／false；歧义映射拒绝，不重新注册来掩盖失败 |
 | 调整页面组件、key 和列表顺序 | `rendering`、`compose-state`；实际点击移动后的项，核对状态与滚动锚点 | 直接改变状态所属作用域另由 `scopes` 检查重置；没有任意槽迁移 |
-| 修改属性、默认值、委托、data class | `properties`；分别调用旧新对象 | 旧对象不重跑构造器；缺失 delegate 或擦除类型不兼容可抛异常 |
+| 修改属性、默认值、委托、data class | `properties`；分别调用旧新对象 | 旧对象不重跑构造器；当前实现仅补齐常量 Compose 状态委托，动态初始化或擦除类型不兼容仍有边界 |
 | 修改挂起请求、Flow、Effect 与事件监听逻辑 | `coroutines`、`effects`；请求、取消、注册、输出次数及旧任务身份 | 仅覆盖兼容的 continuation 布局；不承诺任意 label／spill 迁移 |
 | 修改 Repository、注入对象、网络处理与序列化 | `repositories`、`network`、`build`；真实 Koin、Proxy、HTTP、Retrofit、Gson、serialization | 旧容器和框架缓存不自动重新生成；分别检查旧新实例 |
 | 返回页面、Activity 重建、主题配置变化 | `lifecycle`；显式路由、BackHandler、SavedStateHandle 与 rememberSaveable | 这不是 Navigation Compose 库内部状态验证，也不是进程死亡恢复 |
@@ -46,6 +46,11 @@
 | 自定义绘制／布局中修改原回调 | `framework/custom-drawing`；真实像素、drawWithCache、原 Modifier.Node／MeasurePolicy、尺寸与挂卸载 | 显式绘制／测量失效后核对新逻辑，不外推所有缓存自动失效或任意节点结构变化 |
 | 深链与 Navigation 3 系统返回期间编辑 | `framework/navigation-extensions`；NavDisplay、真实 VIEW／onNewIntent、原活跃页、系统手势取消／提交 | 自定义 PredictiveBackHandler 负责 pop；不覆盖内置预测动画、冷启动或进程死亡 |
 | 新旧内容同时存在和可见性退出期间编辑 | `framework/content-transitions`；AnimatedContent、updateTransition、AnimatedVisibility、原子项和精确释放 | 固定 contentKey 与兼容方法体，不外推共享元素或任意状态结构变化 |
+
+新增 `framework/delegate-state` 与 `framework/scoped-layout` 专项检查常量委托补初始化、
+原对象身份与构造计数，以及子组槽布局变化时保留未变父层／兄弟状态。二者都有原失败
+复现入口；当前源码的修复范围见[框架指南](framework-edits.zh-CN.md)，实际通过范围和
+产物版本以本地记录为准，不外推任意初始化或任意槽迁移。
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、

@@ -142,15 +142,21 @@ internal fun Context.reload(
         val initial = seeds[definition.classId]
         val accessors = installedDex[definition.classId.toFqn()]
             ?.let { readLambdaAccessors(it, definition.classId.value) }.orEmpty()
-        definition.classId to prepareLambdas(definition.classId, definition.original, definition.bytecode,
+        definition.classId to prepareLambdas(definition.classId, definition.original,
+            org.jetbrains.compose.reload.android.host.dex.initializeConstantDelegates(definition.bytecode),
             generation, index.lambdaState(definition.classId), initial, accessors)
     }
     val dex = dexer.dex(plans.values.flatMap { it.classes.entries }.associate { it.key to it.value })
     val staticsOnly = statics.additionalDefinitions.mapTo(HashSet()) { it.classId.toFqn() }
 
     val invocationTypes = InvocationTypes(classPool)
+    val compatibleConstructors = definitions.flatMapTo(mutableSetOf()) { definition ->
+        index.bytecode(definition.classId)?.let { previous ->
+            org.jetbrains.compose.reload.android.host.dex.delegateCompatibleConstructors(previous, definition.original)
+        }.orEmpty()
+    }
     val groups = composeInvalidation(index.currentApplicationInfo, attempt.pending, dirty.dirtyScopes,
-        invocationTypes::declarations, invocationTypes::mayOverlap)
+        invocationTypes::declarations, invocationTypes::mayOverlap, compatibleConstructors)
     val deviceRequestId = UUID.randomUUID().toString()
     onDeviceRequest(deviceRequestId)
     val result = device.reload(

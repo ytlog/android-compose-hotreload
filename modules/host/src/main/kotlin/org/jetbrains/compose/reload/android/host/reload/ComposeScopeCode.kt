@@ -49,6 +49,7 @@ internal data class ComposeScopeCode(
     val initializers: Set<ClassId>,
     val fields: Set<FieldId>,
     val parsed: Boolean,
+    val ownCode: List<String>? = null,
 ) {
     companion object Key : Context.Key.Optional<ComposeScopeCode>()
 }
@@ -96,6 +97,7 @@ class ComposeScopeAnalyzer : ScopeAnalyzerExtension {
             initializers = initializers(evaluation),
             fields = evaluation.filterIsInstance<FieldInsnNode>().map { FieldId(ClassId(it.owner), it.name, it.desc) }.toSet(),
             parsed = parsed,
+            ownCode = ownScopeCode(methodNode, tree),
         ))
     }
 }
