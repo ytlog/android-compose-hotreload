@@ -38,5 +38,6 @@ dependencies {
     ksp("com.google.dagger:hilt-compiler:2.57.2")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.room:room-paging:2.8.4")
     ksp("androidx.room:room-compiler:2.8.4")
 }

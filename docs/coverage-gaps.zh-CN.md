@@ -38,6 +38,8 @@
 | Compose launcher 的系统文档选择期间更新 | `framework/compose-launcher`；rememberLauncherForActivityResult、系统 OpenDocument、父 Activity 停止期间编辑、URI 内容解码、取消、无重复及新页面注册 | API 36 公开版后台重载应答超时，该设备此组未通过；显式使用已安装的 Google DocumentsUI，provider 只提供生成的测试文件；不外推 OEM 默认选择器、权限、相机、Photo Picker、任意生命周期队列或进程死亡恢复 |
 | 保留方法引用／匿名对象时修改逻辑和新增捕获 | `framework/method-references`；真实事件注册、原接收者／回调身份、快照与实时数据、GC／前后台、旧新对象对照 | 新捕获字段在旧对象中为默认 null；不外推成员签名变化、任意捕获改型和歧义映射 |
 | 权限弹窗等待时修改业务和原结果回调 | `framework/permission-launcher`；真实 RequestPermission 拒绝／允许、已授权同步结果、普通 remember 页面、精确交付和新注册 | 仅 CAMERA 授权，不打开相机；不覆盖永久拒绝、权限组、通知权限、进程死亡或 Manifest 热更新 |
+| 网络／数据库分页联动时修改映射 | `framework/remote-feed`；真实 HTTP、RemoteMediator、Room 事务与生成 PagingSource，等待／503／重试／刷新、旧页面与可见行状态 | Room 内存数据库与确定性本地 HTTP；不外推磁盘持久化、schema 迁移、鉴权或远端稳定性 |
+| 半小时持续编辑并保留页面与任务 | `framework/long-session`；30 次更新、至少 30 分钟，原监听器／任务、精确事件、GC／前后台、预设资源增长与心跳门槛 | 第 5 轮后固定检查点；不是全天稳定、无泄漏证明或性能基准，不覆盖 ADB 断连恢复 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、
@@ -54,7 +56,7 @@
 | P1 | 外部系统选择器在前台时的后台重载：API 36 公开版出现应答超时，根因是原进程被厂商冻结；新的受限 provider 唤醒实现见框架指南，公开版本结论仍保留 | 保留超时及线程证据，对照不热更新流程；新产物须补验原页面／launcher／callback 和后续返回，不能靠重启应用判通过 |
 | P1 | remember 初始化执行依赖精度：图片原夹具和调整为标准生命周期的夹具均出现整页重置，后者指向 OkHttpClient.Builder 构造器，公开版限制仍存在 | 新的操作数来源和调用参数分析见框架指南；保留原失败复现，并补初始化真实变化必须重置的反例，不能仅增加全局忽略名单 |
 | P2 | 方法引用／匿名对象的复杂结构演进：新增专项覆盖目标方法体和引用捕获新增，成员签名及捕获改型仍缺失 | 保留 `service::method` 与 `object : Listener`，专项修改成员签名、捕获类型与删除捕获；区分成功、链接错误与拒绝，不能借用 LambdaMetafactory 捕获映射的结论 |
-| P2 | 长会话与连接故障：已有 20 轮和主机退出测试 | 运行前固定会话时长、编辑次数、停顿与资源增长门槛；记录多个阶段的堆、线程、监听器和任务数量；另测 ADB 中断／恢复与失败提示，不把主机终止后的新进程称为原进程重连 |
+| P2 | 全天会话与连接故障：已有原 20 轮、主机退出及新增半小时专项入口，设备通过以本地记录为准 | 在固定半小时门槛之外，按发布需要扩展时长／平台；另测 ADB 中断／恢复与失败提示，不把主机终止后的新进程称为原进程重连 |
 
 ## 需要独立契约的范围
 

@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的十八组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references` 或 `permission-launcher` 单组定位，也可以用
+这里的 `all` **只运行本页的二十组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed` 或 `long-session` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -240,6 +240,53 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
 
 这两组可单独运行。设备通过范围及产物来源以本地记录为准；本地 Compose 修复包与公开 ART
 组合的实测，不代表公开 Compose alpha.2 已包含修复。API 33 暂缓时不补跑其旧组。
+
+## 长会话与网络／数据库分页
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-api36 \
+  --art-dcevm-version VERSION --scenario-group remote-feed long-session
+```
+
+固定包名与原 UI 辅助包不变，不切换输入法。两组仅新增测试夹具，不通过 ViewModel 保存页面。
+同一设备串行，API 33 可独立暂缓；通过组不随另一组的失败重跑。产物来源与结果记录在本地证据，
+使用 Maven Local Compose 修复包不能标记为公开 Compose alpha.2 通过。
+
+`remote-feed` 使用 Room 2.8.4（含 room-paging）、Paging 3.3.6、OkHttp 与设备 loopback HTTP。
+RemoteMediator 等待真实网络响应，映射结果后通过 Room 事务写库；UI 仅通过 Room 生成的
+PagingSource 读取。初始 20 行、追加 10 行、追加 503／重试、刷新 503／重试均有确定数量断言。
+空源及刷新后的边界预取属于正常 Paging 行为，完整 HTTP offset 顺序固定为
+`0,20,30,30,0,0,20`；最后一次预取也实际释放并写库，共 7 个响应、5 次成功事务和 2 次 503。
+更新分别发生在追加请求等待、追加失败、刷新重试等待期间；旧草稿、页面／数据库／mediator／流／
+列表对象，以及追加时实际可见行 key／token 和像素偏移保持。Room 使 PagingSource 失效后，
+加载窗口可能改变，窗口内部索引不要求等同于业务行 id；数据未变化的热更新阶段仍检查内部索引不变。失败不得删除已缓存行；成功刷新才在同一
+事务清空并写入新行。检查 HTTP 请求／响应、成功提交、错误次数及 PagingSource 失效重建，
+最后检查 HOME 恢复不重复请求和页面退出时释放资源。`--feed-phase refresh` 只补刷新相关断言，
+`--feed-phase refresh-finish` 进一步只补刷新更新与释放；
+前置操作重新准备 40 行数据，不重复已经接受的追加热更新。显式刷新前由按钮滚到当前加载窗口起点，不把刷新造成的
+数据替换当作热更新重置。数据库使用真实 Room 内存 SQLite，服务器使用显式响应 gate；不外推
+磁盘持久化、远端认证、数据库 schema 迁移、离线重启或任意 RemoteMediator 实现。
+
+`long-session` 在开始前保存不可变验收计划：30 次更新，更新开始间隔至少 60 秒，整段至少
+1800 秒；前 5 次预热，第 5／10／20／30 轮各取 3 个固定资源样本，其余轮次各取 1 个。
+每次更新后实际调用原注册回调，后台协程持续调用新业务逻辑；检查版本集合、精确累计次数、
+原页面／callback／scope／job 身份和草稿。每轮 GC 后等待，取样间隔固定 1 秒；每 5 轮执行
+HOME／恢复，结尾注销监听器并取消任务。源码、PID、APK、逐轮耗时、指标与失败全部保留。
+
+资源门槛在运行前固定，以第 5 轮 3 个样本的最大值为基线，后续检查点的每个样本均需通过：
+
+| 指标 | 上限 |
+| --- | --- |
+| Java 已用堆 | 基线 + max(32 MiB, 基线的 40%) |
+| Native 已分配堆 | 基线 + max(16 MiB, 基线的 30%) |
+| 应用线程／文件描述符 | 基线 + 8／+ 12 |
+| 主机 RSS | 基线 + max(512 MiB, 基线的 50%) |
+| 活跃后台任务／监听器／注册次数 | 均为 1；退出后任务与监听器为 0 |
+| 单次构建至重载应答 | ≤ 120 秒 |
+| 前台主线程心跳最大间隔 | ≤ 5000 毫秒；HOME 停止期间另行排除 |
+
+这些是固定负载下的稳定性验收门槛，不是性能对照或无泄漏证明。不追加轮次平均越线结果，
+不以较短预检冒充完整 30 分钟通过。ADB 断连恢复、全天使用、其他厂商与框架版本仍需独立验证。
 
 ## 图片初始化依赖与后台冻结
 

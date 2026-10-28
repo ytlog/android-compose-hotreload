@@ -503,6 +503,8 @@ def main():
     parser.add_argument('--device-id',required=True)
     parser.add_argument('--art-dcevm-version',required=True)
     parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
+    parser.add_argument('--feed-phase', choices=['all', 'refresh', 'refresh-finish'], default='all',
+                        help='Retry only the remaining RemoteMediator refresh checks')
     parser.add_argument('--image-phase', choices=['all', 'baseline'], default='all',
                         help='Isolate image I/O; baseline does not validate hot-edit state retention')
     parser.add_argument('--motion-phase', choices=['all', 'animation', 'gestures'], default='all',

@@ -71,6 +71,12 @@ fun FrameworkScreen() {
                         Button(onClick = { nav.navigate("references") }) { Text("References") }
                         Button(onClick = { nav.navigate("permissions") }) { Text("Permissions") }
                     }
+                    Row {
+                        Button(onClick = { nav.navigate("long-session") }) { Text("Session") }
+                        Button(onClick = { nav.navigate("remote-feed") }) { Text("Remote feed") }
+                    }
+                    Text("Session lifetime: ${LongSessionAudit.created}:${LongSessionAudit.disposed}:${SessionSignals.active}:${LongSessionAudit.workers}", fontSize = 10.sp)
+                    Text("Feed lifetime: ${RemoteFeedAudit.created}:${RemoteFeedAudit.disposed}", fontSize = 10.sp)
                     Text("Reference lifetime: ${ReferenceAudit.created}:${ReferenceAudit.disposed}", fontSize = 10.sp)
                     Text("Permission lifetime: ${PermissionAudit.created}:${PermissionAudit.disposed}:${PermissionAudit.deliveries}", fontSize = 10.sp)
                     Text("Image lifetime: ${ImageFixtureAudit.created}:${ImageFixtureAudit.disposed}", fontSize = 10.sp)
@@ -94,6 +100,8 @@ fun FrameworkScreen() {
             composable("launcher") { LauncherScreen() }
             composable("references") { ReferenceScreen() }
             composable("permissions") { PermissionScreen() }
+            composable("long-session") { LongSessionScreen() }
+            composable("remote-feed") { RemoteFeedScreen() }
         }
         Text("Ledger: ${FrameworkLedger.events.joinToString(";")}", fontSize = 8.sp, maxLines = 2)
     }

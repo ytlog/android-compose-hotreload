@@ -6,11 +6,12 @@ import xml.etree.ElementTree as ET
 
 from framework_ui import APP
 from framework_callbacks import CallbackCases
+from framework_stateful import StatefulCases
 
-INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher']
+INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher', 'remote-feed', 'long-session']
 
 
-class IntegrationCases(CallbackCases):
+class IntegrationCases(CallbackCases, StatefulCases):
     def navigation_stacks(self):
         self.r.new_case('stacks-two-nested-destinations')
         self.enter('Stacks')
