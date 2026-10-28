@@ -26,6 +26,7 @@ from ui_driver import UiDriver
 from framework_reactive import ReactiveCases, REACTIVE_GROUPS
 from framework_interop import InteropCases, INTEROP_GROUPS
 from framework_ui import UiFeatureCases, UI_GROUPS
+from framework_integrations import IntegrationCases, INTEGRATION_GROUPS
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLE = ROOT / 'sample'
@@ -34,7 +35,7 @@ SOURCE = MODULE / 'src/main/java/dev/compose/hotreload/framework'
 APP = 'dev.compose.hotreload.framework'
 ACTIVITY = APP + '/.FrameworkActivity'
 FRAMEWORK_GROUPS = ['navigation', 'hilt', 'room', 'input']
-GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS + REACTIVE_GROUPS + UI_GROUPS
+GROUPS = FRAMEWORK_GROUPS + INTEROP_GROUPS + REACTIVE_GROUPS + UI_GROUPS + INTEGRATION_GROUPS
 sha = lambda data: hashlib.sha256(data).hexdigest()
 
 
@@ -497,6 +498,8 @@ def main():
     parser.add_argument('--device-id',required=True)
     parser.add_argument('--art-dcevm-version',required=True)
     parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
+    parser.add_argument('--image-phase', choices=['all', 'baseline'], default='all',
+                        help='Isolate image I/O; baseline does not validate hot-edit state retention')
     parser.add_argument('--motion-phase', choices=['all', 'animation', 'gestures'], default='all',
                         help='Retry only the pending portion of animation-gestures')
     args=parser.parse_args()
@@ -535,6 +538,12 @@ def main():
                 runner.device.tap_text('Back')
             ui_cases = UiFeatureCases(runner)
             for group in ui_groups:getattr(ui_cases, group.replace('-', '_'))()
+        integration_groups = [g for g in groups if g in INTEGRATION_GROUPS]
+        if integration_groups:
+            if framework_groups and not (interop_groups or reactive_groups or ui_groups):
+                runner.device.tap_text('Back')
+            integrations = IntegrationCases(runner)
+            for group in integration_groups:getattr(integrations, group.replace('-', '_'))()
         runner.session.check()
     except BaseException as error:
         runner.results.append(dict(name=runner.case.name if runner.case!=runner.evidence else 'startup',result='FAIL',error=type(error).__name__))

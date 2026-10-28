@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <application android:name=".FrameworkApplication" android:label="Framework edit verification"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <provider android:name=".FixtureDocuments"
+            android:authorities="dev.compose.hotreload.framework.documents"
+            android:exported="true" android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
         <activity android:name=".ReactivePauseActivity" android:exported="false" />
         <activity android:name=".InteropResultActivity" android:exported="false" />
         <activity android:name=".FrameworkActivity" android:exported="true" android:launchMode="singleTop"

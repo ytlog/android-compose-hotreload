@@ -62,6 +62,13 @@ fun FrameworkScreen() {
                         Button(onClick = { nav.navigate("paging") }) { Text("Paging") }
                         Button(onClick = { nav.navigate("motion") }) { Text("Motion") }
                     }
+                    Row {
+                        Button(onClick = { nav.navigate("stacks") }) { Text("Stacks") }
+                        Button(onClick = { nav.navigate("images") }) { Text("Images") }
+                        Button(onClick = { nav.navigate("launcher") }) { Text("Launcher") }
+                    }
+                    Text("Image lifetime: ${ImageFixtureAudit.created}:${ImageFixtureAudit.disposed}", fontSize = 10.sp)
+                    Text("Launcher lifetime: ${LauncherFixtureAudit.created}:${LauncherFixtureAudit.disposed}:${LauncherFixtureAudit.deliveries}", fontSize = 10.sp)
                     Text("Reactive disposed: ${ReactiveAudit.disposed}", fontSize = 10.sp)
                     Text("Interop audit: ${interopAuditSummary()}", fontSize = 10.sp)
                 }
@@ -76,6 +83,9 @@ fun FrameworkScreen() {
             composable("overlays") { OverlayScreen() }
             composable("paging") { PagingScreen() }
             composable("motion") { MotionScreen() }
+            composable("stacks") { StackScreen() }
+            composable("images") { ImageScreen() }
+            composable("launcher") { LauncherScreen() }
         }
         Text("Ledger: ${FrameworkLedger.events.joinToString(";")}", fontSize = 8.sp, maxLines = 2)
     }

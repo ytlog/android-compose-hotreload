@@ -34,6 +34,10 @@
 | 分页请求等待／失败期间更新，保留当前翻页状态 | `framework/paging-pager`；真实 PagingSource、cachedIn、LazyPagingItems、LazyColumn、HorizontalPager，等待请求／重试的新结果、可见行锚点及页内状态 | 内存数据源与显式等待 gate；不外推 RemoteMediator、网络／数据库分页或全部 Paging 版本 |
 | 动画进行中、手指按住时修改原回调 | `framework/animation-gestures`；Animatable 原对象／帧回调、任务及取消次数，pointerInput 跨更新的同一次 DOWN／MOVE／UP | 单指输入与兼容方法体编辑；不外推任意 Transition、状态机／捕获布局演进或多指竞争 |
 
+| 切换多个已保存导航栈后编辑当前页面 | `framework/navigation-stacks`；两个嵌套图、各自详情与返回、entry／草稿／计数／滚动状态恢复，活跃页普通 remember 与原 lambda | 正常离开组合树由 rememberSaveable 恢复；不代表 inactive 页的普通 remember 对象存活，不外推深链或任意导航图重构 |
+| 图片请求等待时修改业务和原回调 | `framework/async-images`；Coil 2.7.0 AsyncImage、真实 HTTP PNG、原 request／loader／callback、内存缓存无额外请求、503 与重试、退出释放 | 公开 alpha.2 状态保留检查失败：Effect／具体 client／不可变 requestMode 形式仍由 OkHttpClient 初始化依赖触发整页重置；baseline 只验证未热更新的图片管线，见框架指南；不外推 Coil 3、磁盘缓存、鉴权、变换或真实远端故障 |
+| Compose launcher 的系统文档选择期间更新 | `framework/compose-launcher`；rememberLauncherForActivityResult、系统 OpenDocument、父 Activity 停止期间编辑、URI 内容解码、取消、无重复及新页面注册 | API 36 公开版后台重载应答超时，该设备此组未通过；显式使用已安装的 Google DocumentsUI，provider 只提供生成的测试文件；不外推 OEM 默认选择器、权限、相机、Photo Picker、任意生命周期队列或进程死亡恢复 |
+
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、
 `workflow-test.py` 和新增的 `framework-edit-test.py`；不能把一个 runner 的 `full`／`all`
@@ -46,6 +50,8 @@
 
 | 优先级 | 缺口与当前最接近的覆盖 | 最小补验标准 |
 | --- | --- | --- |
+| P1 | 外部系统选择器在前台时的后台重载：API 36 出现应答超时，根因待定位 | 保留超时及线程证据，对照不热更新流程；确认设备端执行与消息调度原因后，再补验原页面／launcher／callback 和后续返回，不能靠重启应用判通过 |
+| P1 | remember 初始化执行依赖精度：图片原夹具和调整为标准生命周期的夹具均出现整页重置，后者指向 OkHttpClient.Builder 构造器，公开版限制仍存在 | 精确区分实际初始化调用与无关同类型回调；保留原失败复现，并补初始化真实变化必须重置的反例，不能仅增加全局忽略名单 |
 | P2 | 绑定方法引用与匿名对象的捕获演进：已有 Java `String::toUpperCase` 和 Retrofit 匿名回调，但没有相应专项演进断言 | 保留 `service::method` 与 `object : Listener`，分别修改目标体、成员签名、捕获布局；检查原接收者数据和引用，区分成功、链接错误与拒绝；不能借用 LambdaMetafactory 捕获映射的结论 |
 | P2 | 长会话与连接故障：已有 20 轮和主机退出测试 | 运行前固定会话时长、编辑次数、停顿与资源增长门槛；记录多个阶段的堆、线程、监听器和任务数量；另测 ADB 中断／恢复与失败提示，不把主机终止后的新进程称为原进程重连 |
 

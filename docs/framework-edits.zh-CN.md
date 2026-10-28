@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的十三组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 或 `animation-gestures` 单组定位，也可以用
+这里的 `all` **只运行本页的十六组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images` 或 `compose-launcher` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -67,6 +67,69 @@ collectAsLazyPagingItems、LazyColumn 和 HorizontalPager，在可控挂起的�
 `animation-gestures` 支持 `--motion-phase animation` 或 `--motion-phase gestures`，
 用于只补验失败部分。公开版本验收须使用独立消费工程和公开仓库，核对解析产物与 APK 内引擎哈希；
 不能将此处开发 runner 的 Maven Local 结果记成公开包实测。
+
+只验收多返回栈、异步图片及 Compose launcher 时使用：
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-apiNN \
+  --art-dcevm-version VERSION --scenario-group navigation-stacks async-images compose-launcher
+```
+
+三组直接进入各自页面，沿用固定包名，不切换输入法；公开版本仍须在独立公开仓库消费工程执行，
+不能用 Maven Local 结果代替。每台设备使用独立源码和构建目录，已通过组不随失败组重跑。
+
+- `navigation-stacks`：Navigation Compose 的两个嵌套图分别进入详情，使用 `saveState`／
+  `restoreState` 切换返回栈。保留每个 destination 的 entry、草稿、计数和 LazyColumn 位置；
+  在当前详情修改业务与原点击 lambda，再恢复另一栈并分别 pop。正常导航移出组合树时使用
+  `rememberSaveable` 和列表自身 Saver；热更新额外核对当前页面普通 `remember` token 与回调对象。
+  不使用 ViewModel，不声称导航本身会保留已经销毁的普通 remember 对象。
+- `async-images`：固定 Coil 2.7.0 的真实 `AsyncImage`／ImageLoader／ImageRequest，加载设备
+  loopback HTTP 服务返回的 PNG。服务用显式 gate 等待，跨业务与原成功 lambda 修改后释放，
+  核对像素、NETWORK 来源、原请求／loader／回调及草稿。重新显示同一请求须命中 MEMORY_CACHE
+  且无新 HTTP 请求；另测真实 503、修改错误状态下的业务后重试、退出时关闭 loader 与服务。
+  测试服务在 `DisposableEffect` 启动／关闭，loader 使用已构造的 OkHttpClient，
+  请求在 remember 外读取不可变 requestMode，再作为 key 与请求参数。关闭磁盘缓存，禁用网络自动重试；不外推 Coil 3、磁盘缓存、鉴权、图片转换或远端服务稳定性。
+- `compose-launcher`：`rememberLauncherForActivityResult` 使用 OpenDocument 契约打开真实系统
+  Google DocumentsUI（测试设备须已安装 `com.google.android.documentsui`，不使用 OEM 默认文件管理器），
+  同包受 MANAGE_DOCUMENTS 保护的 DocumentsProvider 仅提供生成的测试 PNG。
+  父 Activity 停止且选择器打开时修改业务和原 callback，然后实际点击文件，读取 URI 并解码核对。
+  再检查系统取消、前后台无重复交付、页面移除和重新进入后的新 launcher。选择器期间只接受明确
+  的 DocumentsUI 窗口，并继续监测原 PID 和外部触摸；不放宽其他测试的前台检查。
+  此用例不模拟 dispatchResult，不读取用户文件；不外推权限对话框、相机、Photo Picker、
+  任意 LifecycleOwner 的结果队列或进程死亡恢复。
+
+以上方法体编辑以保留现有状态为验收条件；状态由夹具按钮准备，不能代替输入法协议验证。
+图片服务与文档 provider 在基线安装时即存在，不将新增 Manifest 声明算作热更新能力。
+
+2026-10-28 公开版本结果（Compose `0.1.0-alpha.2`／ART `0.1.0-alpha.4`）：
+
+| 新增组 | API 33 | API 36 |
+| --- | --- | --- |
+| 多返回栈导航 | 通过，2 次热更新 | 通过，2 次热更新 |
+| 异步图片 | 基础加载／缓存／重试通过；热更新状态保留失败 | 基础加载／缓存／重试通过；热更新状态保留失败 |
+| Compose launcher | 通过，2 次热更新及全部 6 个检查点 | 后台重载应答超时，未通过 |
+
+两台 launcher 不热更新对照均通过；不将其算作热更新通过。已通过的导航复用原 APK 结果，
+后续只运行未完成组；源码、公开产物与 APK 哈希和逐次失败证据保留在本地忽略目录。
+
+**公开版本初始化限制（尚未修复）：** Compose `0.1.0-alpha.2` 的保守分析仍可能把
+未知外部 API 的同类型回调、remember 初始化内的 State 读取扩大为执行依赖。原图片夹具在
+构造函数中启动线程、使用 callback 形式的 client 工厂，并在 request 的 remember 初始化内
+读取可变 mode；修改图片成功回调依赖的业务函数时，API 33 实测页面、loader、请求和草稿重置。
+调整为 Effect 启动服务、具体 client 与不可变 requestMode 后，API 36 仍实测重置，主机原因
+指向 `OkHttpClient.Builder.<init>`。仅分析项目类的诊断无法排除完整依赖类路径中的初始化传播。
+这两份失败均保留，不能用调整夹具或基础图片加载通过结果代替状态保留验证。
+
+`--image-phase baseline` 仅运行真实 HTTP／PNG、内存缓存、503／重试及退出清理，不执行热更新，
+用于区分图片管线自身问题和初始化失效问题。默认 `all` 保留热更新后对象／草稿不变的严格断言；
+公开 alpha.2 目前在首个图片业务编辑检查失败，后续原成功 lambda、热更新后的缓存及重试检查
+不能标记为通过。页面仍使用普通 remember，没有 ViewModel，也没有修改公开产物。
+
+**系统选择器后台重载：** API 36 的公开版验证出现设备重载应答超时：业务编辑曾成功应答，
+随后原 callback 编辑未收到应答；另一次在业务编辑时即超时。主机线程等待设备返回，现有证据
+尚不能确定设备端根因，不能认定该组通过。不做热更新的同流程对照单独记录，不能代替热更新验收。
+选择文件需兼容 DocumentsUI 的根目录入口及 content-desc 文件名；HOME 后须等待 Activity
+完成停止，不能仅凭暂停状态马上切回，避免系统转场覆盖页面。以上只修改新用例脚本，未替换公开运行库。
 
 Hilt／KSP 插件在 sample 根构建仅声明 `apply false`，避免父子插件类加载器选择不同的
 JavaPoet；只在 framework 模块应用。热更新插件通过 AGP 的 `ScopedArtifact.CLASSES`
