@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的二十组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed` 或 `long-session` 单组定位，也可以用
+这里的 `all` **只运行本页的二十三组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed`、`long-session`、`search-races`、`state-form` 或 `nested-scroll` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -334,3 +334,33 @@ shell 或 root 的调用，只返回 PID；不启动 Activity、不关闭选择�
 本组不修改数据库 schema，不自动重建旧 DI 对象，不迁移任意 Compose 槽或任意协程
 状态机。Navigation 3、原生 View 池复用／复杂手势、生命周期绑定结果队列、任意匿名捕获演进和长时间连接故障
 仍需各自专项用例，不能因本组通过而划为完成。
+
+## 搜索竞争、多字段表单与嵌套滚动
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-api36 \
+  --art-dcevm-version VERSION --scenario-group search-races state-form nested-scroll
+```
+
+三组继续复用固定应用与 UI 辅助包，只使用普通 `remember` 页面。`state-form` 使用固定测试
+输入法包，新增 Next／Done 命令经真实 InputConnection 发送；同签名辅助包使用覆盖安装，
+不卸载，不改变包名，结束恢复原输入法。`--form-phase transforms` 只补转换及后续动作，
+重新准备输入前置状态但不重跑已通过的校验热更新；InputConnection 的选区偏移包含显示前缀，
+TextFieldState 的选区按原始文本计算，断言分别核对。设备通过和产物来源以本地验证记录为准，不能把
+本地 Compose 修复包的结果标成公开 Compose 版本通过。
+
+- `search-races`：250 ms debounce 和 flatMapLatest；三次间隔 40 ms 的查询只启动最后请求。
+  请求等待时修改业务映射，然后切换查询并取消旧收集；先完成新请求，再显式交付旧响应，
+  检查迟到结果不能覆盖。另修改原 mapper 回调，核对请求／取消／交付精确序列，原任务、
+  页面、查询与回调身份，GC／HOME 恢复和退出取消。这里使用可控异步响应，不是 HTTP；
+  真实 HTTP／Room 分页另由 remote-feed 覆盖，不外推所有网络客户端取消实现。
+- `state-form`：两个真实 state-based BasicTextField；中文 composing、非末尾光标期间修改校验，
+  原 TextFieldState、选区、composition、焦点和输入连接保持。真实 IME Next 移动到数字字段；
+  修改已持有 InputTransformation／OutputTransformation 的业务函数，验证新长度约束、
+  实际输入使缓存失效后的编辑器显示，以及未被格式化污染的原始文本；不声称无输入时
+  立即刷新已有输出缓存。修改原 Done 回调后验证一次提交、前后台
+  无重复、退出释放。不使用 ViewModel，不覆盖自动填充、密码管理器或厂商候选引擎。
+- `nested-scroll`：真实触摸拖动 LazyColumn 与折叠标题栏，保留 NestedScrollConnection、列表、
+  PullToRefreshState 与原刷新回调。滚动后修改连接业务逻辑，核对位置／折叠量保留及后续
+  拖动执行新逻辑；真实下拉触发一次刷新，在原任务等待期间编辑，继续下拉不重复请求，
+  完成原任务使用新结果。GC／HOME 不增加刷新，退出释放。不外推多指或任意布局结构变动。

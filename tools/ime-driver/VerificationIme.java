@@ -27,6 +27,8 @@ public final class VerificationIme extends InputMethodService {
                 case "commit": ok = connection.commitText(text, 1); break;
                 case "select": ok = connection.setSelection(intent.getIntExtra("start", -1), intent.getIntExtra("end", -1)); break;
                 case "finish": ok = connection.finishComposingText(); break;
+                case "next": ok = connection.performEditorAction(EditorInfo.IME_ACTION_NEXT); break;
+                case "done": ok = connection.performEditorAction(EditorInfo.IME_ACTION_DONE); break;
                 case "status": ok = true; break;
                 default: setResultCode(3); setResultData("unknown-command"); return;
             }

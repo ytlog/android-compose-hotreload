@@ -75,6 +75,14 @@ fun FrameworkScreen() {
                         Button(onClick = { nav.navigate("long-session") }) { Text("Session") }
                         Button(onClick = { nav.navigate("remote-feed") }) { Text("Remote feed") }
                     }
+                    Row {
+                        Button(onClick = { nav.navigate("search") }) { Text("Search") }
+                        Button(onClick = { nav.navigate("form") }) { Text("Form") }
+                        Button(onClick = { nav.navigate("scroll") }) { Text("Scroll") }
+                    }
+                    Text("Form lifetime: ${FormAudit.created}:${FormAudit.disposed}", fontSize = 10.sp)
+                    Text("Scroll lifetime: ${ScrollAudit.created}:${ScrollAudit.disposed}", fontSize = 10.sp)
+                    Text("Search lifetime: ${SearchAudit.created}:${SearchAudit.disposed}:${SearchAudit.active}", fontSize = 10.sp)
                     Text("Session lifetime: ${LongSessionAudit.created}:${LongSessionAudit.disposed}:${SessionSignals.active}:${LongSessionAudit.workers}", fontSize = 10.sp)
                     Text("Feed lifetime: ${RemoteFeedAudit.created}:${RemoteFeedAudit.disposed}", fontSize = 10.sp)
                     Text("Reference lifetime: ${ReferenceAudit.created}:${ReferenceAudit.disposed}", fontSize = 10.sp)
@@ -100,6 +108,9 @@ fun FrameworkScreen() {
             composable("launcher") { LauncherScreen() }
             composable("references") { ReferenceScreen() }
             composable("permissions") { PermissionScreen() }
+            composable("form") { FormScreen() }
+            composable("scroll") { ScrollScreen() }
+            composable("search") { SearchScreen() }
             composable("long-session") { LongSessionScreen() }
             composable("remote-feed") { RemoteFeedScreen() }
         }

@@ -40,6 +40,9 @@
 | 权限弹窗等待时修改业务和原结果回调 | `framework/permission-launcher`；真实 RequestPermission 拒绝／允许、已授权同步结果、普通 remember 页面、精确交付和新注册 | 仅 CAMERA 授权，不打开相机；不覆盖永久拒绝、权限组、通知权限、进程死亡或 Manifest 热更新 |
 | 网络／数据库分页联动时修改映射 | `framework/remote-feed`；真实 HTTP、RemoteMediator、Room 事务与生成 PagingSource，等待／503／重试／刷新、旧页面与可见行状态 | Room 内存数据库与确定性本地 HTTP；不外推磁盘持久化、schema 迁移、鉴权或远端稳定性 |
 | 半小时持续编辑并保留页面与任务 | `framework/long-session`；30 次更新、至少 30 分钟，原监听器／任务、精确事件、GC／前后台、预设资源增长与心跳门槛 | 第 5 轮后固定检查点；不是全天稳定、无泄漏证明或性能基准，不覆盖 ADB 断连恢复 |
+| 搜索查询竞争期间修改映射 | `framework/search-races`；debounce、flatMapLatest、旧响应晚到、原 mapper／任务、精确取消与交付 | 可控异步响应，不外推全部 HTTP 客户端或任意挂起状态机变化 |
+| 多字段表单中修改转换和提交 | `framework/state-form`；TextFieldState、中文 composition、Input／OutputTransformation、真实 IME Next／Done | 不覆盖自动填充、密码管理器或厂商候选引擎 |
+| 嵌套滚动和下拉刷新期间修改回调 | `framework/nested-scroll`；折叠标题栏、原连接／列表／刷新状态、等待任务和单次刷新 | 单指触摸与兼容方法体编辑，不外推多指竞争或任意布局结构变化 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、

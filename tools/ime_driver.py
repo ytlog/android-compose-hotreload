@@ -54,12 +54,10 @@ class ImeDriver:
         apk = build(self.evidence)
         installed = self.d.adb('shell', 'pm', 'path', PACKAGE, check=False).strip().removeprefix('package:')
         digest = hashlib.sha256(apk.read_bytes()).hexdigest()
-        if installed:
-            assert self.d.adb('shell', 'sha256sum', installed).split()[0] == digest, 'Different existing test IME; do not overwrite it'
-        else:
+        if not installed or self.d.adb('shell', 'sha256sum', installed).split()[0] != digest:
             with (self.evidence / 'ime-install.log').open('w') as log:
-                subprocess.run(['adb', '-s', self.d.serial, 'install', '--no-incremental', str(apk)], stdout=log, stderr=subprocess.STDOUT, check=True, timeout=90)
-            self.installed_here = True
+                subprocess.run(['adb', '-s', self.d.serial, 'install', '--no-incremental', '-r', str(apk)], stdout=log, stderr=subprocess.STDOUT, check=True, timeout=90)
+            self.installed_here = not bool(installed)
         self.enabled_here = COMPONENT not in enabled.splitlines()
         self.d.adb('shell', 'ime', 'enable', COMPONENT)
         self.d.adb('shell', 'ime', 'set', COMPONENT)

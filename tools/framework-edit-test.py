@@ -310,7 +310,7 @@ class Runner:
         module.APP=APP
         self.device=module.Device(args.serial)
         self.ui=UiDriver(self.device,self.evidence)
-        self.ime=ImeDriver(self.device,self.evidence) if any(g in args.scenario_group for g in ['all','input']) else None
+        self.ime=ImeDriver(self.device,self.evidence) if any(g in args.scenario_group for g in ['all','input','state-form']) else None
         self.permission_fixture=PermissionFixture(self) if any(g in args.scenario_group for g in ['all','permission-launcher']) else None
         self.session=DeviceSession(self.device,self.evidence,APP)
         self.environment=dict(os.environ,ANDROID_SERIAL=args.serial,ORG_GRADLE_PROJECT_artDcevmVersion=args.art_dcevm_version)
@@ -503,6 +503,7 @@ def main():
     parser.add_argument('--device-id',required=True)
     parser.add_argument('--art-dcevm-version',required=True)
     parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
+    parser.add_argument('--form-phase', choices=['all', 'transforms'], default='all')
     parser.add_argument('--feed-phase', choices=['all', 'refresh', 'refresh-finish'], default='all',
                         help='Retry only the remaining RemoteMediator refresh checks')
     parser.add_argument('--image-phase', choices=['all', 'baseline'], default='all',
