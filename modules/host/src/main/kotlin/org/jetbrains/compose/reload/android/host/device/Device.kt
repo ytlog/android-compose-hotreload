@@ -86,6 +86,9 @@ internal class Device private constructor(
     }
 
     fun send(message: Protocol.Message) {
+        if (message is Protocol.Reload || message is Protocol.ResetComposition) {
+            wakeRuntime(hello.packageName, hello.pid) { arguments -> adb.run(*arguments.toTypedArray()) }
+        }
         synchronized(output) { Protocol.write(output, message) }
     }
 
@@ -93,7 +96,12 @@ internal class Device private constructor(
     fun reload(reload: Protocol.Reload): Protocol.ReloadResult {
         val result = CompletableFuture<Protocol.ReloadResult>()
         synchronized(pendingReloads) { pendingReloads[reload.reloadRequestId] = result }
-        send(reload)
+        try {
+            send(reload)
+        } catch (failure: Throwable) {
+            synchronized(pendingReloads) { pendingReloads.remove(reload.reloadRequestId) }
+            throw failure
+        }
         val reply = result.get()
         /* Policy rejections include lastRejection directly. Some ART checks only explain themselves in logcat. */
         if (!reply.success && reply.errorMessage?.contains("FAILURE TO REDEFINE") == true) {

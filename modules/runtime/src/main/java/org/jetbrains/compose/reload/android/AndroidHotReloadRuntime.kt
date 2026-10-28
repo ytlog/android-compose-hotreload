@@ -10,6 +10,8 @@ import android.net.LocalServerSocket
 import android.net.LocalSocket
 import android.net.Uri
 import android.os.Process
+import android.os.Binder
+import android.os.Bundle
 import android.util.Log
 import org.jetbrains.compose.reload.android.protocol.Protocol
 import java.io.IOException
@@ -130,6 +132,16 @@ internal class AndroidHotReloadInitializer : ContentProvider() {
     override fun onCreate(): Boolean {
         AndroidHotReloadRuntime.start(requireNotNull(context))
         return true
+    }
+
+    override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
+        val uid = Binder.getCallingUid()
+        // ContentProvider.call does not enforce read/write permissions itself.
+        if (uid != Process.myUid() && uid != 2000 && uid != 0) {
+            throw SecurityException("Only the debug host may ping the runtime")
+        }
+        require(method == "ping") { "Unknown runtime provider call" }
+        return Bundle().apply { putInt("pid", Process.myPid()) }
     }
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, args: Array<out String>?, sort: String?): Cursor? = null
