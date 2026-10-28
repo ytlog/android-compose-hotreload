@@ -43,6 +43,9 @@
 | 搜索查询竞争期间修改映射 | `framework/search-races`；debounce、flatMapLatest、旧响应晚到、原 mapper／任务、精确取消与交付 | 可控异步响应，不外推全部 HTTP 客户端或任意挂起状态机变化 |
 | 多字段表单中修改转换和提交 | `framework/state-form`；TextFieldState、中文 composition、Input／OutputTransformation、真实 IME Next／Done | 不覆盖自动填充、密码管理器或厂商候选引擎 |
 | 嵌套滚动和下拉刷新期间修改回调 | `framework/nested-scroll`；折叠标题栏、原连接／列表／刷新状态、等待任务和单次刷新 | 单指触摸与兼容方法体编辑，不外推多指竞争或任意布局结构变化 |
+| 自定义绘制／布局中修改原回调 | `framework/custom-drawing`；真实像素、drawWithCache、原 Modifier.Node／MeasurePolicy、尺寸与挂卸载 | 显式绘制／测量失效后核对新逻辑，不外推所有缓存自动失效或任意节点结构变化 |
+| 深链与 Navigation 3 系统返回期间编辑 | `framework/navigation-extensions`；NavDisplay、真实 VIEW／onNewIntent、原活跃页、系统手势取消／提交 | 自定义 PredictiveBackHandler 负责 pop；不覆盖内置预测动画、冷启动或进程死亡 |
+| 新旧内容同时存在和可见性退出期间编辑 | `framework/content-transitions`；AnimatedContent、updateTransition、AnimatedVisibility、原子项和精确释放 | 固定 contentKey 与兼容方法体，不外推共享元素或任意状态结构变化 |
 
 执行命令和精确预期见[真实编辑指南](real-edits.zh-CN.md)及[集成场景](integration-edits.zh-CN.md)。
 完整消费方验收同时涉及 `real-edit-test.py`、`device-test.py`、`resource-test.py`、

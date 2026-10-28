@@ -8,11 +8,12 @@ from framework_ui import APP
 from framework_callbacks import CallbackCases
 from framework_stateful import StatefulCases
 from framework_daily import DailyCases
+from framework_visual import VisualCases
 
-INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher', 'remote-feed', 'long-session', 'search-races', 'state-form', 'nested-scroll']
+INTEGRATION_GROUPS = ['navigation-stacks', 'async-images', 'compose-launcher', 'method-references', 'permission-launcher', 'remote-feed', 'long-session', 'search-races', 'state-form', 'nested-scroll', 'custom-drawing', 'navigation-extensions', 'content-transitions']
 
 
-class IntegrationCases(CallbackCases, StatefulCases, DailyCases):
+class IntegrationCases(CallbackCases, StatefulCases, DailyCases, VisualCases):
     def navigation_stacks(self):
         self.r.new_case('stacks-two-nested-destinations')
         self.enter('Stacks')

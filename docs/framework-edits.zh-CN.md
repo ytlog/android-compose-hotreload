@@ -15,8 +15,8 @@ python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-
   --art-dcevm-version VERSION --scenario-group all
 ```
 
-这里的 `all` **只运行本页的二十三组**，不运行原有四套完整 runner。
-可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed`、`long-session`、`search-races`、`state-form` 或 `nested-scroll` 单组定位，也可以用
+这里的 `all` **只运行本页的二十六组**，不运行原有四套完整 runner。
+可以选择 `navigation`、`hilt`、`room`、`input`、`androidview`、`native-listener`、`activity-result`、`snapshot-flow`、`derived-state`、`lifecycle-flow`、`overlays`、`paging-pager` 、`animation-gestures`、`navigation-stacks`、`async-images`、`compose-launcher`、`method-references`、`permission-launcher`、`remote-feed`、`long-session`、`search-races`、`state-form`、`nested-scroll`、`custom-drawing`、`navigation-extensions` 或 `content-transitions` 单组定位，也可以用
 `--scenario-group hilt room input` 在同一会话只补验尚未通过的组。两台设备在同一 checkout
 运行时必须串行，因为 runner 临时修改源码并在退出时恢复；不允许边测试边编辑这些文件。
 多设备并行时使用独立 checkout、构建输出和证据目录，并为每份 checkout 准备相同版本的
@@ -364,3 +364,43 @@ TextFieldState 的选区按原始文本计算，断言分别核对。设备通�
   PullToRefreshState 与原刷新回调。滚动后修改连接业务逻辑，核对位置／折叠量保留及后续
   拖动执行新逻辑；真实下拉触发一次刷新，在原任务等待期间编辑，继续下拉不重复请求，
   完成原任务使用新结果。GC／HOME 不增加刷新，退出释放。不外推多指或任意布局结构变动。
+
+## 自定义绘制／布局、导航扩展与内容切换动画
+
+```sh
+python3 tools/framework-edit-test.py --serial DEVICE_SELECTOR --device-id local-api36 \
+  --art-dcevm-version VERSION --scenario-group custom-drawing navigation-extensions content-transitions
+```
+
+三组仅新增固定包内的测试夹具，继续核对原 PID、基线 APK 和普通 `remember` 状态。
+Navigation 3 固定为 1.0.0；新的 Activity 和深链过滤器在基线 APK 中安装，不属于 Manifest
+热更新。API 33 可单独暂缓，产物来源及设备通过范围以本地验证记录为准。
+
+- `custom-drawing`：Canvas／drawWithCache、Modifier.Node 和自定义 MeasurePolicy。
+  原页面、节点和测量策略在方法体编辑后保留；实际 draw 失效事件触发原缓存回调与节点使用
+  新颜色，真实 screencap 像素必须与同图不变的参考色块完全一致；不把 Display P3 编码值
+  直接与 sRGB 数值比较。测量失效后宽度从 120 dp 变为 160 dp，高度保持，
+  尺寸变化才重建对应绘制缓存。检查节点只挂载一次、退出只卸载一次，GC／前后台结果保持。
+  不将日志中的颜色值当作实际渲染，不声称任意缓存都能在没有失效事件时自动刷新。
+- `navigation-extensions`：固定包内独立 Activity，真实 Navigation 3 NavDisplay／NavEntry、
+  VIEW 深链和 singleTop onNewIntent；活跃 entry 的普通 remember 与原页面在编辑中保留。
+  测试保存并临时启用设备预测返回开关，结束后恢复。shell 输入辅助程序保留同一次 DOWN
+  的时间戳，从系统边缘注入真实触摸事件，不安装新 APK、不直接调用应用回调；
+  PredictiveBackHandler 接收进度。手势保持期间修改逻辑，
+  后续进度使用新代码，取消不弹栈，完成只弹一次。重新显示被覆盖 entry 时核对其
+  rememberSaveable 草稿与标识；不要求离开组合树的普通 remember 对象继续存活。
+  本组自定义 PredictiveBackHandler 负责 pop，不代表 NavDisplay 内置预测返回动画、冷启动
+  深链、进程死亡或任意导航图结构变化已覆盖。结束返回原父页面，不使用 ViewModel。
+  `--nav-phase back` 只重建必要返回栈，然后补手势及后续检查，不重跑已通过的详情页热更新；
+  当前 shell 手势辅助程序要求 API 34+；本轮坐标按 API 36 的 3200×2136 横屏和手势导航
+  验证，其他尺寸／导航模式须另行适配，不据此宣称 API 33 本组已兼容。
+- `content-transitions`：updateTransition／AnimatedContent 的新旧内容同时存在时修改显示和
+  已存在的子项回调，保留父页面及两个子项状态。使用 600 秒真实过渡留出编辑窗口，等待
+  原动画时钟自然结束，再核对旧内容只释放一次；不假定修改正在执行的 tween 时长或
+  系统动画倍率会立即结束当前过渡。重叠子项可能不出现在无障碍树中，因此由各子项的
+  DisposableEffect 注册实际 remember 对象，父层仅展示其身份、计数与实际渲染文本，
+  不另建一套替代子项状态。AnimatedVisibility 在退出期间编辑，再反向取消，原子项不释放；
+  随后的新退出使用 300 ms 规格，完成后只释放一次。最后核对前后台和整页退出释放。
+  `--content-phase settle` 只建立必要的新旧内容状态并补完成／可见性检查，跳过已通过的
+  内容显示和子项回调热更新；完整流程仍应使用默认 `all`。这里只改兼容方法体，
+  不外推共享元素、任意 contentKey 或状态机结构迁移。

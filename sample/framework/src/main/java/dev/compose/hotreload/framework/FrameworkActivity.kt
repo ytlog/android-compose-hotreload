@@ -34,6 +34,7 @@ class FrameworkActivity : ComponentActivity() {
 
 @Composable
 fun FrameworkScreen() {
+    val context = LocalContext.current
     val nav = rememberNavController()
     val current by nav.currentBackStackEntryAsState()
     val root = remember { token() }
@@ -80,6 +81,15 @@ fun FrameworkScreen() {
                         Button(onClick = { nav.navigate("form") }) { Text("Form") }
                         Button(onClick = { nav.navigate("scroll") }) { Text("Scroll") }
                     }
+                    Row {
+                        Button(onClick = { nav.navigate("drawing") }) { Text("Drawing") }
+                        Button(onClick = { context.startActivity(android.content.Intent(context, NavExtensionActivity::class.java)) }) { Text("Nav extensions") }
+                        Button(onClick = { nav.navigate("content") }) { Text("Content motion") }
+                    }
+                    Text("Draw lifetime: ${DrawAudit.created}:${DrawAudit.disposed}:${DrawAudit.attached}:${DrawAudit.detached}", fontSize = 10.sp)
+                    Text("Nav extension lifetime: ${NavExtensionAudit.created}:${NavExtensionAudit.disposed}", fontSize = 10.sp)
+                    Text("Content cleanup: ${ContentAudit.children}:${ContentAudit.removed}:${ContentAudit.visibleCreated}:${ContentAudit.visibleRemoved}", fontSize = 10.sp)
+                    Text("Content page lifetime: ${ContentAudit.pages}:${ContentAudit.disposed}", fontSize = 10.sp)
                     Text("Form lifetime: ${FormAudit.created}:${FormAudit.disposed}", fontSize = 10.sp)
                     Text("Scroll lifetime: ${ScrollAudit.created}:${ScrollAudit.disposed}", fontSize = 10.sp)
                     Text("Search lifetime: ${SearchAudit.created}:${SearchAudit.disposed}:${SearchAudit.active}", fontSize = 10.sp)
@@ -110,6 +120,8 @@ fun FrameworkScreen() {
             composable("permissions") { PermissionScreen() }
             composable("form") { FormScreen() }
             composable("scroll") { ScrollScreen() }
+            composable("drawing") { DrawScreen() }
+            composable("content") { ContentScreen() }
             composable("search") { SearchScreen() }
             composable("long-session") { LongSessionScreen() }
             composable("remote-feed") { RemoteFeedScreen() }

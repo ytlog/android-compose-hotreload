@@ -11,6 +11,15 @@
             android:permission="android.permission.MANAGE_DOCUMENTS">
             <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
         </provider>
+        <activity android:name=".NavExtensionActivity" android:exported="true"
+            android:launchMode="singleTop" android:enableOnBackInvokedCallback="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hotreload-fixture" android:host="nav" android:pathPrefix="/item/" />
+            </intent-filter>
+        </activity>
         <activity android:name=".ReactivePauseActivity" android:exported="false" />
         <activity android:name=".InteropResultActivity" android:exported="false" />
         <activity android:name=".FrameworkActivity" android:exported="true" android:launchMode="singleTop"

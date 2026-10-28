@@ -503,6 +503,8 @@ def main():
     parser.add_argument('--device-id',required=True)
     parser.add_argument('--art-dcevm-version',required=True)
     parser.add_argument('--scenario-group',choices=GROUPS+['all'],nargs='+',default=['all'])
+    parser.add_argument('--content-phase', choices=['all', 'settle'], default='all')
+    parser.add_argument('--nav-phase', choices=['all', 'back'], default='all')
     parser.add_argument('--form-phase', choices=['all', 'transforms'], default='all')
     parser.add_argument('--feed-phase', choices=['all', 'refresh', 'refresh-finish'], default='all',
                         help='Retry only the remaining RemoteMediator refresh checks')
