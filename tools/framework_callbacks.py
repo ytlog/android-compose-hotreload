@@ -16,12 +16,24 @@ class PermissionFixture:
         self.r = runner
         self.original = None
 
-    def state(self):
-        dump = self.r.device.adb('shell', 'dumpsys', 'package', APP)
-        match = re.search(r'android\.permission\.CAMERA: granted=(true|false), flags=\[([^]]*)\]', dump)
+    @staticmethod
+    def parse_state(dump, user):
+        # Some Android builds omit the flags suffix when no flags are set.
+        # Restrict the lookup to the active user, including on multi-user OEMs.
+        section = re.search(r'^\s*User ' + re.escape(user) + r':.*?(?=^\s*User \d+:|\Z)',
+                            dump, re.MULTILINE | re.DOTALL)
+        assert section, 'Active user missing from installed fixture'
+        match = re.search(r'^\s*android\.permission\.CAMERA: granted=(true|false)'
+                          r'(?:, flags=\[([^]\n]*)\])?[ \t]*$', section[0], re.MULTILINE)
         assert match, 'Camera runtime permission missing from installed fixture'
-        flags = set(re.findall(r'[A-Z_]+', match[2]))
+        flags = set(re.findall(r'[A-Z_]+', match[2] or ''))
         return {'granted': match[1] == 'true', 'flags': sorted(flags)}
+
+    def state(self):
+        user = self.r.device.adb('shell', 'am', 'get-current-user').strip()
+        assert user.isdecimal(), 'Cannot identify active permission user'
+        dump = self.r.device.adb('shell', 'dumpsys', 'package', APP)
+        return self.parse_state(dump, user)
 
     def command(self, command, *args):
         return self.r.device.adb('shell', 'pm', command, APP, self.permission, *args)
