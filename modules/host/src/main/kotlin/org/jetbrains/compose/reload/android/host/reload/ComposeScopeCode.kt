@@ -17,8 +17,19 @@ import org.objectweb.asm.tree.InvokeDynamicInsnNode
 import org.objectweb.asm.tree.TypeInsnNode
 import org.objectweb.asm.tree.AbstractInsnNode
 
-internal data class ExecutedCall(val method: MethodId, val virtual: Boolean)
-internal data class DeferredCall(val type: ClassId, val call: ExecutedCall)
+internal data class ExecutedCall(
+    val method: MethodId,
+    val virtual: Boolean,
+    val receiverType: ClassId? = null,
+    val nullArguments: Set<Int> = emptySet(),
+    val argumentTypes: Map<Int, ClassId> = emptyMap(),
+    val argumentCallbacks: Map<Int, Set<DeferredCall>> = emptyMap(),
+    val receiverCallbacks: Set<DeferredCall>? = null,
+    val externalArguments: Boolean = false,
+    val parameterArguments: Map<Int, Int> = emptyMap(),
+    val receiverParameter: Int? = null,
+)
+internal data class DeferredCall(val invocation: MethodId, val call: ExecutedCall)
 
 /** JVM invocation edges, excluding lambda implementation handles (creation is not invocation). */
 internal data class MethodExecutionCode(
@@ -27,6 +38,7 @@ internal data class MethodExecutionCode(
     val initializers: Set<ClassId>,
     val deferred: Set<DeferredCall>,
     val known: Boolean,
+    val bridgeCasts: Map<Int, ClassId> = emptyMap(),
 ) {
     companion object Key : Context.Key.Optional<MethodExecutionCode>()
 }
@@ -43,7 +55,12 @@ internal data class ComposeScopeCode(
 
 /** Keep cache evaluation dependencies separate from the bodies of cached lambda objects. */
 class ComposeScopeAnalyzer : ScopeAnalyzerExtension {
+    private val operands = CallOperands()
+
     override fun analyze(methodId: MethodId, methodNode: MethodNode, tree: InstructionTree): Context {
+        val callSites = operands.analyze(methodId, methodNode)
+        fun call(node: MethodInsnNode) = callSites[node] ?: ExecutedCall(
+            MethodId(ClassId(node.owner), node.name, node.desc), node.opcode == INVOKEVIRTUAL || node.opcode == INVOKEINTERFACE)
         val instructions = tree.tokens.flatMap { it.instructions }
         val calls = instructions.filterIsInstance<MethodInsnNode>()
         val cacheCalls = calls.filter { (it.owner in setOf("androidx/compose/runtime/Composer", "androidx/compose/runtime/ComposerKt") &&
@@ -65,30 +82,50 @@ class ComposeScopeAnalyzer : ScopeAnalyzerExtension {
         }
         val dynamic = methodCode.filterIsInstance<InvokeDynamicInsnNode>()
         val execution = MethodExecutionCode(
-            calls = methodCode.filterIsInstance<MethodInsnNode>().map {
-                ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc), it.opcode == INVOKEVIRTUAL || it.opcode == INVOKEINTERFACE)
-            }.toSet(),
+            calls = methodCode.filterIsInstance<MethodInsnNode>().map(::call).toSet(),
             fields = methodCode.filterIsInstance<FieldInsnNode>().filter { it.opcode == GETFIELD || it.opcode == GETSTATIC }
                 .map { FieldId(ClassId(it.owner), it.name, it.desc) }.toSet(),
             initializers = initializers(methodCode),
-            deferred = dynamic.filter { it.bsm.owner == "java/lang/invoke/LambdaMetafactory" }.flatMap { indy ->
-                indy.bsmArgs.filterIsInstance<Handle>().map {
-                    DeferredCall(ClassId(Type.getReturnType(indy.desc).internalName),
-                        ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc),
-                            it.tag == H_INVOKEVIRTUAL || it.tag == H_INVOKEINTERFACE))
-                }
-            }.toSet(),
+            deferred = dynamic.flatMap { lambdaCalls(it).orEmpty() }.toSet(),
             known = dynamic.all { it.bsm.owner in setOf("java/lang/invoke/LambdaMetafactory", "java/lang/invoke/StringConcatFactory") },
+            bridgeCasts = bridgeCasts(methodNode),
         )
         return Context(MethodExecutionCode with execution, ComposeScopeCode with ComposeScopeCode(
             hasCache = cacheCalls.isNotEmpty(),
-            directCalls = evaluation.filterIsInstance<MethodInsnNode>().map {
-                ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc), it.opcode == INVOKEVIRTUAL || it.opcode == INVOKEINTERFACE)
-            }.toSet(),
+            directCalls = evaluation.filterIsInstance<MethodInsnNode>().map(::call).toSet(),
             initializers = initializers(evaluation),
             fields = evaluation.filterIsInstance<FieldInsnNode>().map { FieldId(ClassId(it.owner), it.name, it.desc) }.toSet(),
             parsed = parsed,
         ))
+    }
+}
+
+/** Casts before the first executable call in a bridge; an impossible cast cannot reach its body. */
+private fun bridgeCasts(method: MethodNode): Map<Int, ClassId> {
+    if (method.access and ACC_BRIDGE == 0) return emptyMap()
+    val arguments = mutableMapOf<Int, Int>()
+    var slot = if (method.access and ACC_STATIC == 0) 1 else 0
+    Type.getArgumentTypes(method.desc).forEachIndexed { index, type -> arguments[slot] = index; slot += type.size }
+    val casts = mutableMapOf<Int, ClassId>()
+    var loaded: Int? = null
+    for (instruction in method.instructions) {
+        if (instruction.opcode < 0) continue
+        when (instruction.opcode) {
+            ALOAD -> loaded = arguments[(instruction as org.objectweb.asm.tree.VarInsnNode).`var`]
+            CHECKCAST -> loaded?.let { casts[it] = ClassId((instruction as TypeInsnNode).desc) }
+            else -> break
+        }
+    }
+    return casts
+}
+
+internal fun lambdaCalls(indy: InvokeDynamicInsnNode): Set<DeferredCall>? {
+    if (indy.bsm.owner != "java/lang/invoke/LambdaMetafactory") return null
+    return indy.bsmArgs.filterIsInstance<Handle>().mapTo(mutableSetOf()) {
+        DeferredCall(MethodId(ClassId(Type.getReturnType(indy.desc).internalName), indy.name,
+            (indy.bsmArgs.first() as Type).descriptor),
+            ExecutedCall(MethodId(ClassId(it.owner), it.name, it.desc),
+                it.tag == H_INVOKEVIRTUAL || it.tag == H_INVOKEINTERFACE))
     }
 }
 

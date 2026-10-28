@@ -4,6 +4,8 @@ import org.jetbrains.compose.reload.analysis.ClassInfo
 import org.jetbrains.compose.reload.analysis.ClassId
 import org.jetbrains.compose.reload.analysis.MethodId
 import org.jetbrains.compose.reload.android.host.reload.DeferredLibraryCalls
+import org.jetbrains.compose.reload.android.host.reload.CacheEvaluation
+import org.jetbrains.compose.reload.android.host.reload.ExecutedCall
 import org.jetbrains.compose.reload.analysis.MutableApplicationInfo
 import org.jetbrains.compose.reload.android.host.reload.composeInvalidation
 import org.objectweb.asm.ClassWriter
@@ -22,6 +24,8 @@ class ComposeInvalidationTest {
                     outside: Boolean = false, debug: Boolean = true, keyComparison: Int = 0,
                     factory: Boolean = false, invoke: Boolean = false, eager: Boolean = false,
                     classLambda: Boolean = false, library: Boolean = false, initializer: String? = null,
+                    nullCallback: Boolean = false, stringifyCallback: Boolean = false,
+                    exactFactory: Boolean = false,
                     lazyApi: MethodId? = null, readWrapper: Boolean = false,
                     callbackType: String = "java/util/function/Supplier", callbackMethod: String = "get",
                     callbackArgs: String = "") =
@@ -107,7 +111,8 @@ class ComposeInvalidationTest {
                 visitMethod(ACC_PUBLIC or ACC_STATIC, "helper", "()Ljava/lang/String;", null, null).apply {
                     visitCode()
                     if (factory) {
-                        visitMethodInsn(INVOKESTATIC, "fixture/Screen", "factory", "()L$callbackType;", false)
+                        val factoryType = if (exactFactory) "fixture/Listener" else callbackType
+                        visitMethodInsn(INVOKESTATIC, "fixture/Screen", "factory", "()L$factoryType;", false)
                         if (lazyApi != null) {
                             if (Type.getArgumentTypes(lazyApi.methodDescriptor).size == 2) {
                                 visitInsn(ACONST_NULL); visitInsn(SWAP)
@@ -122,7 +127,10 @@ class ComposeInvalidationTest {
                                 visitTypeInsn(CHECKCAST, "java/lang/String")
                             } else { visitInsn(POP); visitLdcInsn("deferred") }
                         } else if (library) {
+                            if (nullCallback) { visitInsn(POP); visitInsn(ACONST_NULL) }
                             visitMethodInsn(INVOKESTATIC, "library/Consumer", "consume", "(Ljava/util/function/Supplier;)Ljava/lang/String;", false)
+                        } else if (stringifyCallback) {
+                            visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false)
                         } else if (invoke) {
                             visitMethodInsn(INVOKEINTERFACE, "java/util/function/Supplier", "get", "()Ljava/lang/Object;", true)
                             visitTypeInsn(CHECKCAST, "java/lang/String")
@@ -134,7 +142,8 @@ class ComposeInvalidationTest {
                     visitMethod(ACC_PUBLIC or ACC_STATIC, "callback", "($callbackArgs)Ljava/lang/String;", null, null).apply {
                         visitCode(); visitLdcInsn(helper); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
                     }
-                    visitMethod(ACC_PUBLIC or ACC_STATIC, "factory", "()L$callbackType;", null, null).apply {
+                    val factoryType = if (exactFactory) "fixture/Listener" else callbackType
+                    visitMethod(ACC_PUBLIC or ACC_STATIC, "factory", "()L$factoryType;", null, null).apply {
                         visitCode()
                         if (eager) {
                             visitMethodInsn(INVOKESTATIC, "fixture/Screen", "callback", "($callbackArgs)Ljava/lang/String;", false)
@@ -170,6 +179,12 @@ class ComposeInvalidationTest {
 
     private data class LazyApi(val method: MethodId, val arity: Int)
     private val lazyApis = listOf(
+        LazyApi(MethodId(ClassId("kotlin/LazyKt"), "lazy",
+            "(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;"), 0),
+        LazyApi(MethodId(ClassId("kotlin/LazyKt"), "lazy",
+            "(Lkotlin/LazyThreadSafetyMode;Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;"), 0),
+        LazyApi(MethodId(ClassId("kotlin/LazyKt"), "lazy",
+            "(Ljava/lang/Object;Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;"), 0),
         LazyApi(MethodId(ClassId("androidx/compose/runtime/SnapshotStateKt"), "derivedStateOf",
             "(Lkotlin/jvm/functions/Function0;)Landroidx/compose/runtime/State;"), 0),
         LazyApi(MethodId(ClassId("androidx/compose/runtime/SnapshotStateKt"), "derivedStateOf",
@@ -212,6 +227,98 @@ class ComposeInvalidationTest {
         val types = DeferredLibraryCalls.evaluatedTypes(consumer)
         assertTrue(ClassId("kotlin/jvm/functions/Function0") in types)
         assertTrue(ClassId("kotlin/jvm/functions/Function3") in types)
+    }
+
+    @Test
+    fun `foreign consumers cannot invent app callbacks but real overridden bodies still execute`() {
+        val context = ClassId("library/Context")
+        val fold = MethodId(context, "fold", "(Ljava/lang/Object;Lkotlin/jvm/functions/Function2;)Ljava/lang/Object;")
+        for (override in listOf(false, true)) {
+            fun fixture(value: String) = app(factory = true, helper = value,
+                callbackType = "kotlin/jvm/functions/Function2", callbackMethod = "invoke",
+                callbackArgs = "Ljava/lang/Object;Ljava/lang/Object;").apply {
+                if (override) add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
+                    visit(V11, ACC_PUBLIC, "fixture/Context", null, "java/lang/Object", arrayOf(context.value))
+                    visitMethod(ACC_PUBLIC, "fold", fold.methodDescriptor, null, null).apply {
+                        visitCode(); visitInsn(ACONST_NULL); visitInsn(ACONST_NULL)
+                        visitMethodInsn(INVOKESTATIC, "fixture/Screen", "callback", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/String;", false)
+                        visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                    }
+                    visitEnd()
+                }.toByteArray())))
+            }
+            val before = fixture("old")
+            val after = fixture("changed")
+            val evaluation = CacheEvaluation(before, after, emptySet(), emptySet(),
+                declarations = { if (it == context) setOf(fold) else null })
+            val call = ExecutedCall(MethodId(ClassId("library/Consumer"), "consume", "(Llibrary/Context;)V"), false)
+            assertTrue(evaluation.changed(call) == override)
+        }
+    }
+
+    @Test
+    fun `known and opaque consumers retain argument provenance with conservative unknown receivers`() {
+        val supplier = ClassId("java/util/function/Supplier")
+        for (known in listOf(false, true)) for (exact in listOf(false, true)) {
+            fun fixture(value: String) = app(cache = true, factory = true, library = true,
+                classLambda = true, exactFactory = exact).apply {
+                if (known) add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
+                    visit(V11, ACC_PUBLIC, "library/Consumer", null, "java/lang/Object", null)
+                    visitMethod(ACC_PUBLIC or ACC_STATIC, "consume", "(Ljava/util/function/Supplier;)Ljava/lang/String;", null, null).apply {
+                        visitCode(); visitVarInsn(ALOAD, 0)
+                        visitMethodInsn(INVOKEINTERFACE, supplier.value, "get", "()Ljava/lang/Object;", true)
+                        visitTypeInsn(CHECKCAST, "java/lang/String"); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                    }
+                    visitEnd()
+                }.toByteArray())))
+                add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
+                    visit(V11, ACC_PUBLIC, "fixture/UnrelatedSupplier", null, "java/lang/Object", arrayOf(supplier.value))
+                    visitMethod(ACC_PUBLIC, "get", "()Ljava/lang/Object;", null, null).apply {
+                        visitCode(); visitLdcInsn(value); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                    }
+                    visitEnd()
+                }.toByteArray())))
+            }
+            val before = fixture("old")
+            val after = fixture("changed unrelated supplier")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            val plan = composeInvalidation(before, after, dirty, declarations = { type ->
+                if (type == supplier) setOf(MethodId(type, "get", "()Ljava/lang/Object;")) else null
+            })
+            assertContentEquals(if (exact) intArrayOf() else intArrayOf(100), plan.reset)
+        }
+    }
+
+    @Test
+    fun `known callback consumed through library declaration still resets when its body changes`() {
+        val before = app(cache = true, factory = true, library = true, classLambda = true, exactFactory = true)
+        val after = app(cache = true, factory = true, library = true, classLambda = true, exactFactory = true, helper = "new")
+        val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+        assertContentEquals(intArrayOf(100), composeInvalidation(before, after, dirty, declarations = { type ->
+            if (type.value == "java/util/function/Supplier") setOf(MethodId(type, "get", "()Ljava/lang/Object;")) else null
+        }).reset)
+    }
+
+    @Test
+    fun `null callback passed to opaque library does not execute unrelated lambdas`() {
+        for (classLambda in listOf(false, true)) {
+            val before = app(cache = true, factory = true, library = true, nullCallback = true, classLambda = classLambda)
+            val after = app(cache = true, factory = true, library = true, nullCallback = true,
+                classLambda = classLambda, helper = "changed unrelated callback")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(intArrayOf(), composeInvalidation(before, after, dirty).reset)
+        }
+    }
+
+    @Test
+    fun `calling Object methods on a callback does not execute its SAM`() {
+        for (classLambda in listOf(false, true)) {
+            val before = app(cache = true, factory = true, stringifyCallback = true, classLambda = classLambda)
+            val after = app(cache = true, factory = true, stringifyCallback = true,
+                classLambda = classLambda, helper = "changed deferred callback")
+            val dirty = after.groupIndex.values.flatten() + after.methodIndex.values.map { it.rootScope }
+            assertContentEquals(intArrayOf(), composeInvalidation(before, after, dirty).reset)
+        }
     }
 
     @Test
@@ -358,4 +465,41 @@ class ComposeInvalidationTest {
         assertTrue(100 in plan.reset)
         assertTrue(100 !in plan.recompose)
     }
+    @Test
+    fun `bridge casts exclude impossible dispatch but retain Number inputs and changed casts`() {
+        fun fixture(value: String, cast: String = "java/lang/Number", prefixCall: Boolean = false) = MutableApplicationInfo().apply {
+            add(requireNotNull(ClassInfo(ClassWriter(ClassWriter.COMPUTE_MAXS).apply {
+                visit(V11, ACC_PUBLIC, "fixture/Bridge", null, "java/lang/Object", arrayOf("kotlin/jvm/functions/Function1"))
+                visitMethod(ACC_PUBLIC or ACC_BRIDGE or ACC_SYNTHETIC, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;", null, null).apply {
+                    visitCode()
+                    if (prefixCall) {
+                        visitInsn(ACONST_NULL)
+                        visitMethodInsn(INVOKESTATIC, "fixture/Bridge", "body", "(Ljava/lang/Object;)Ljava/lang/Object;", false)
+                        visitInsn(POP)
+                    }
+                    visitVarInsn(ALOAD, 1); visitTypeInsn(CHECKCAST, cast)
+                    visitMethodInsn(INVOKESTATIC, "fixture/Bridge", "body", "(Ljava/lang/Object;)Ljava/lang/Object;", false)
+                    visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                }
+                visitMethod(ACC_PUBLIC or ACC_STATIC, "body", "(Ljava/lang/Object;)Ljava/lang/Object;", null, null).apply {
+                    visitCode(); visitLdcInsn(value); visitInsn(ARETURN); visitMaxs(0, 0); visitEnd()
+                }
+                visitEnd()
+            }.toByteArray())))
+        }
+        val types = org.jetbrains.compose.reload.android.host.reload.InvocationTypes(javassist.ClassPool(true))
+        val before = fixture("old")
+        fun changed(argument: String, cast: String = "java/lang/Number") = CacheEvaluation(
+            before, fixture("new", cast), emptySet(), emptySet(), typesMayOverlap = types::mayOverlap
+        ).changed(ExecutedCall(MethodId(ClassId("kotlin/jvm/functions/Function1"), "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;"),
+            true, argumentTypes = mapOf(0 to ClassId(argument))))
+        assertTrue(!changed("java/lang/String"))
+        assertTrue(changed("java/lang/Long")) // Kotlin numeric bridges accept Number, not only Integer.
+        assertTrue(changed("java/lang/String", "java/lang/String"))
+        val sideEffectsBeforeCast = CacheEvaluation(fixture("old", prefixCall = true), fixture("new", prefixCall = true),
+            emptySet(), emptySet(), typesMayOverlap = types::mayOverlap)
+        assertTrue(sideEffectsBeforeCast.changed(ExecutedCall(MethodId(ClassId("kotlin/jvm/functions/Function1"), "invoke",
+            "(Ljava/lang/Object;)Ljava/lang/Object;"), true, argumentTypes = mapOf(0 to ClassId("java/lang/String")))))
+    }
+
 }

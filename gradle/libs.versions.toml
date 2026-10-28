@@ -29,6 +29,7 @@ kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", ve
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 asm-core = { module = "org.ow2.asm:asm", version.ref = "asm" }
 asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "asm" }
 javassist = { module = "org.javassist:javassist", version.ref = "javassist" }
 r8 = { module = "com.android.tools:r8", version.ref = "r8" }
 junit = { module = "junit:junit", version.ref = "junit" }

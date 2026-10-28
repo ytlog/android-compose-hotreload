@@ -7,6 +7,7 @@ import org.jetbrains.compose.reload.analysis.MethodId
 import org.jetbrains.compose.reload.analysis.ScopeHash
 import org.jetbrains.compose.reload.analysis.ScopeInfo
 import org.jetbrains.compose.reload.analysis.ScopeType
+import org.jetbrains.compose.reload.analysis.ClassId
 import org.jetbrains.compose.reload.core.createLogger
 import org.jetbrains.compose.reload.core.info
 
@@ -20,6 +21,8 @@ internal class ComposeInvalidation(
 
 internal fun composeInvalidation(
     current: ApplicationInfo, pending: ApplicationInfo, dirtyScopes: List<ScopeInfo>,
+    declarations: (ClassId) -> Set<MethodId>? = { null },
+    typesMayOverlap: (ClassId, ClassId) -> Boolean = { _, _ -> true },
 ): ComposeInvalidation {
     val reset = mutableListOf<Int>()
     val recompose = mutableListOf<Int>()
@@ -35,7 +38,7 @@ internal fun composeInvalidation(
             } ?: true
         } ?: true
     }
-    val evaluation = CacheEvaluation(current, pending, dirtyMethods, dirtyFields)
+    val evaluation = CacheEvaluation(current, pending, dirtyMethods, dirtyFields, declarations, typesMayOverlap)
     fun cacheReason(scope: ScopeInfo): String? {
         val code = scope.extras[ComposeScopeCode] ?: return "missing scope metadata: ${scope.methodId}"
         if (!code.parsed) return "missing cache ranges: ${scope.methodId} (${scope.group})"

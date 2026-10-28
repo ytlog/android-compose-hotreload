@@ -148,7 +148,9 @@ internal fun Context.reload(
     val dex = dexer.dex(plans.values.flatMap { it.classes.entries }.associate { it.key to it.value })
     val staticsOnly = statics.additionalDefinitions.mapTo(HashSet()) { it.classId.toFqn() }
 
-    val groups = composeInvalidation(index.currentApplicationInfo, attempt.pending, dirty.dirtyScopes)
+    val invocationTypes = InvocationTypes(classPool)
+    val groups = composeInvalidation(index.currentApplicationInfo, attempt.pending, dirty.dirtyScopes,
+        invocationTypes::declarations, invocationTypes::mayOverlap)
     val deviceRequestId = UUID.randomUUID().toString()
     onDeviceRequest(deviceRequestId)
     val result = device.reload(

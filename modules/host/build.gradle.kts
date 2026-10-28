@@ -37,6 +37,7 @@ dependencies {
     implementation(libs.coroutines)
     implementation(libs.javassist)
     implementation(libs.asm.tree)
+    implementation(libs.asm.analysis)
 
     /* D8: Converts the redefined classes to DEX */
     implementation(libs.r8)
