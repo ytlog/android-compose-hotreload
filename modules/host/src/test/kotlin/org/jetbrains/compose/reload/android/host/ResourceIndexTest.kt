@@ -71,4 +71,29 @@ class ResourceIndexTest {
         file.snapshot(configurations = "string/title ()")
         assertContains(assertFailsWith<IllegalStateException> { index.pending() }.message!!, "configurations were removed")
     }
+    @Test fun `oversized changed APK is rejected before loading and a corrected snapshot recovers`() = withBundle { file ->
+        file.snapshot()
+        val index = ResourceIndex(file)
+        java.io.RandomAccessFile(file, "rw").use { it.setLength(org.jetbrains.compose.reload.android.protocol.Protocol.MAX_FRAME_SIZE.toLong() + 1) }
+        assertContains(assertFailsWith<IllegalStateException> { index.pending() }.message!!, "payload limit")
+        file.snapshot("fixed")
+        assertNotNull(index.pending())
+    }
+
+    @Test fun `initial and unchanged snapshots fit below APK and inflated asset sizes`() = withBundle { file ->
+        val executable = File(System.getProperty("java.home"), "bin/java").path
+        val classes = listOf(ResourceIndex::class.java, ResourceIndexMemoryProbe::class.java,
+            kotlin.Unit::class.java, org.jetbrains.compose.reload.android.protocol.Protocol::class.java)
+        val classpath = classes.map { File(it.protectionDomain.codeSource.location.toURI()).path }
+            .distinct().joinToString(File.pathSeparator)
+        val output = file.resolveSibling("memory-probe.log")
+        val process = ProcessBuilder(executable, "-Xmx24m", "-cp", classpath,
+            ResourceIndexMemoryProbe::class.java.name, file.path).redirectErrorStream(true).redirectOutput(output).start()
+        try {
+            assertTrue(process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS), "Resource low-heap probe timed out")
+            assertEquals(0, process.exitValue(), output.readText())
+            assertContains(output.readText(), "PASS: resource snapshots bounded")
+        } finally { process.destroyForcibly() }
+    }
+
 }

@@ -1,5 +1,6 @@
 package org.jetbrains.compose.reload.android.host.device
 
+import org.jetbrains.compose.reload.android.host.reload.recordReloadTiming
 import org.jetbrains.compose.reload.android.protocol.Protocol
 import org.jetbrains.compose.reload.android.protocol.IoDeadline
 import org.jetbrains.compose.reload.android.protocol.TransportFailure
@@ -43,6 +44,8 @@ internal class RuntimeConnection private constructor(
     private var failure: IOException? = null
     private val pending = mutableMapOf<String, CompletableFuture<Protocol.ReloadResult>>()
     private val listeners = mutableListOf<(Protocol.Message) -> Unit>()
+    // Render can precede the acknowledgement or arrive later. Diagnostic state is bounded per session.
+    private val awaitingRender = linkedMapOf<String, Long>()
 
     // An uncertain transaction keeps the host available to report failures through orchestration.
     // It must not trigger the ordinary host shutdown path, which shuts down the application too.
@@ -63,6 +66,10 @@ internal class RuntimeConnection private constructor(
                     if (message is Protocol.ReloadResult) {
                         synchronized(state) { pending.remove(message.reloadRequestId)?.complete(message) }
                     } else {
+                        if (message is Protocol.UIRendered && message.reloadRequestId != null) {
+                            val started = synchronized(state) { awaitingRender.remove(message.reloadRequestId) }
+                            if (started != null) recordReloadTiming(message.reloadRequestId, "DISPATCH_TO_RENDER", started)
+                        }
                         synchronized(listeners) { listeners.toList() }.forEach { listener ->
                             runCatching { listener(message) }.onFailure {
                                 connectionLogger.error("Failed handling '${message.javaClass.simpleName}'", it)
@@ -91,6 +98,7 @@ internal class RuntimeConnection private constructor(
         failure = terminal
         pending.values.forEach { it.completeExceptionally(terminal) }
         pending.clear()
+        awaitingRender.clear()
         runCatching { socket.close() }
         if (terminal !is ReloadOutcomeUnknownException) closed.complete(Unit)
         if (contextual !is TransportFailure || contextual.reason != LOCAL_CLOSE) connectionLogger.error(contextual.message ?: "Runtime transport failed")
@@ -99,7 +107,12 @@ internal class RuntimeConnection private constructor(
     fun send(message: Protocol.Message) {
         require(message !is Protocol.Reload) { "Reloads require acknowledgement tracking" }
         ensureUsable()
-        val prepared = prepare(message)
+        write(prepare(message))
+    }
+
+    private fun write(prepared: Protocol.PreparedMessage) {
+        val started = System.nanoTime()
+        var succeeded = false
         var finished = false
         val deadline = deadlines.schedule({
             synchronized(state) {
@@ -112,12 +125,14 @@ internal class RuntimeConnection private constructor(
                 prepared.writeTo(output)
             }
             ensureUsable()
+            succeeded = true
         } catch (error: IOException) {
             fail(TransportFailure.io(WRITE_FRAME, prepared.requestId(), error))
             ensureUsable()
         } finally {
             synchronized(state) { finished = true }
             deadline.cancel(false)
+            prepared.requestId()?.let { recordReloadTiming(it, "WRITE_FRAME", started, prepared.wireSize().toLong(), succeeded) }
         }
     }
 
@@ -137,19 +152,28 @@ internal class RuntimeConnection private constructor(
             check(pending.isEmpty()) { "A reload is already in progress" }
             pending[request.reloadRequestId] = reply
         }
-        val deadline = deadlines.schedule({
-            synchronized(state) {
-                if (pending[request.reloadRequestId] === reply) {
-                    fail(TransportFailure(RELOAD, TIMEOUT, request.reloadRequestId, "deadline=${reloadTimeoutMillis}ms", null))
-                }
-            }
-        }, reloadTimeoutMillis, TimeUnit.MILLISECONDS)
+        var deadline: java.util.concurrent.ScheduledFuture<*>? = null
         try {
-            synchronized(output) {
-                ensureUsable()
-                prepared.writeTo(output)
+            synchronized(state) {
+                awaitingRender[request.reloadRequestId] = System.nanoTime()
+                if (awaitingRender.size > 64) awaitingRender.remove(awaitingRender.keys.first())
             }
-            return reply.get()
+            // Writes get their own deadline. Only a fully flushed frame begins the result wait.
+            write(prepared)
+            val waitStarted = System.nanoTime()
+            deadline = deadlines.schedule({
+                synchronized(state) {
+                    if (pending[request.reloadRequestId] === reply) {
+                        fail(TransportFailure(RELOAD, TIMEOUT, request.reloadRequestId, "result deadline=${reloadTimeoutMillis}ms", null))
+                    }
+                }
+            }, reloadTimeoutMillis, TimeUnit.MILLISECONDS)
+            var received = false
+            try {
+                return reply.get().also { received = true }
+            } finally {
+                recordReloadTiming(request.reloadRequestId, "WAIT_RESULT", waitStarted, success = received)
+            }
         } catch (error: ExecutionException) {
             throw error.cause ?: error
         } catch (error: Exception) {
@@ -158,7 +182,7 @@ internal class RuntimeConnection private constructor(
             ensureUsable()
             throw error
         } finally {
-            deadline.cancel(false)
+            deadline?.cancel(false)
         }
     }
 

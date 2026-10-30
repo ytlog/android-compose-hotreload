@@ -62,8 +62,10 @@ internal fun Context.reload(
     requestId: OrchestrationMessageId,
 ): Try<ResolvedDirtyScopes> = Try {
     device.ensureUsable()
+    val deviceRequestId = requestId.encodeToByteArray().decodeToString()
+    val preparationStarted = System.nanoTime()
     // Validate before adding/redefining any classes, including mixed code/resource edits.
-    val resourceApk = resources.pending()
+    val resourceApk = timedReload(deviceRequestId, "RESOURCE_CHECK") { resources.pending() }
     val classPool = index.classPool()
 
     val definitions = pendingChanges.mapNotNull { (file, change) ->
@@ -138,7 +140,7 @@ internal fun Context.reload(
             index.lambdaState(definition.classId) == null && readClass(it).lambdaSites().isNotEmpty()
         }?.let { definition.classId to it }
     }.toMap()
-    val installedDex = dexer.dex(seeds)
+    val installedDex = timedReload(deviceRequestId, "DEX_SEED") { dexer.dex(seeds) }
     val plans = allDefinitions.associate { definition ->
         val initial = seeds[definition.classId]
         val accessors = installedDex[definition.classId.toFqn()]
@@ -147,7 +149,9 @@ internal fun Context.reload(
             org.jetbrains.compose.reload.android.host.dex.initializeConstantDelegates(definition.bytecode),
             generation, index.lambdaState(definition.classId), initial, accessors)
     }
-    val dex = dexer.dex(plans.values.flatMap { it.classes.entries }.associate { it.key to it.value })
+    val dex = timedReload(deviceRequestId, "DEX_COMPILE") {
+        dexer.dex(plans.values.flatMap { it.classes.entries }.associate { it.key to it.value })
+    }
     val staticsOnly = statics.additionalDefinitions.mapTo(HashSet()) { it.classId.toFqn() }
 
     val invocationTypes = InvocationTypes(classPool)
@@ -158,8 +162,9 @@ internal fun Context.reload(
     }
     val groups = composeInvalidation(index.currentApplicationInfo, attempt.pending, dirty.dirtyScopes,
         invocationTypes::declarations, invocationTypes::mayOverlap, compatibleConstructors)
-    val deviceRequestId = requestId.encodeToByteArray().decodeToString()
-    val result = device.reload(
+    recordReloadTiming(deviceRequestId, "PREPARE_TOTAL", preparationStarted,
+        dex.values.sumOf { it.size.toLong() } + (resourceApk?.size ?: 0))
+    val result = timedReload(deviceRequestId, "DEVICE_ROUND_TRIP") { device.reload(
         Protocol.Reload(
             deviceRequestId,
             dex.map { (className, bytes) ->
@@ -172,7 +177,7 @@ internal fun Context.reload(
             resourceApk,
             groups.recompose,
         )
-    )
+    ) }
 
     if (result.classesAdded || result.success) {
         definitions.filter { it.isNew }.forEach { index.added(it.classId, it.original, plans.getValue(it.classId).state) }

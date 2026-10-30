@@ -41,8 +41,8 @@ class RuntimeConnectionTest {
                 } catch (error: Throwable) { done.completeExceptionally(error) }
             }
         }
-        fun connect(handshake: Long = 2_000, reload: Long = 2_000, frame: Long = 120_000) = RuntimeConnection.connect(
-            InetSocketAddress(InetAddress.getLoopbackAddress(), server.localPort), "fixture.app", handshake, reload, frameTimeoutMillis = frame
+        fun connect(handshake: Long = 2_000, reload: Long = 2_000, frame: Long = 120_000, write: Long = 10_000) = RuntimeConnection.connect(
+            InetSocketAddress(InetAddress.getLoopbackAddress(), server.localPort), "fixture.app", handshake, reload, writeTimeoutMillis = write, frameTimeoutMillis = frame
         )
         override fun close() {
             accepted.getNow(null)?.close()
@@ -173,9 +173,14 @@ class RuntimeConnectionTest {
             hello(socket)
             finish.get(5, TimeUnit.SECONDS) // never read the large request
         }.use { peer ->
-            peer.connect(reload = 150).use { connection ->
+            peer.connect(write = 150, reload = 2_000).use { connection ->
                 val large = Protocol.Reload("large", emptyList(), emptyList(), intArrayOf(), ByteArray(16 * 1024 * 1024))
-                assertFailsWith<ReloadOutcomeUnknownException> { connection.reload(large) }
+                val error = assertFailsWith<ReloadOutcomeUnknownException> { connection.reload(large) }
+                val failure = error.cause as TransportFailure
+                assertEquals(TransportFailure.Stage.WRITE_FRAME, failure.stage)
+                assertEquals(TransportFailure.Reason.TIMEOUT, failure.reason)
+                assertEquals("large", failure.requestId)
+                assertFalse(connection.closed.isDone)
                 assertFailsWith<ReloadOutcomeUnknownException> { connection.reload(request()) }
                 finish.complete(Unit)
             }
@@ -251,4 +256,27 @@ class RuntimeConnectionTest {
             }
         }
     }
+    @Test
+    fun `flushed reload gets a separate result window and cancelled write timers cannot close it`() {
+        val finish = CompletableFuture<Unit>()
+        Peer { socket ->
+            hello(socket)
+            repeat(2) {
+                val request = Protocol.read(socket.getInputStream()) as Protocol.Reload
+                Thread.sleep(350) // Longer than write deadline, within the result deadline.
+                Protocol.write(socket.getOutputStream(), result(request.reloadRequestId))
+            }
+            finish.get(5, TimeUnit.SECONDS)
+        }.use { peer ->
+            peer.connect(write = 150, reload = 1_500).use { connection ->
+                assertTrue(connection.reload(request()).success)
+                assertTrue(connection.reload(request("second")).success)
+                Thread.sleep(350)
+                connection.ensureUsable()
+                finish.complete(Unit)
+                peer.done.get(5, TimeUnit.SECONDS)
+            }
+        }
+    }
+
 }

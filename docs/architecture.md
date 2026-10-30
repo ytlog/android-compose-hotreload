@@ -167,3 +167,25 @@ to stay in the foreground and records a foreground/process change as an invalid 
 replace real-page state, compilation / resource, JNI-mode or full device-matrix acceptance.
 Raw evidence stays in the ignored local evidence directory. Each run requires a new output
 directory so earlier failures cannot be overwritten.
+
+
+### Resource memory and reload timing
+
+The host retains only the installed resource metadata and digest. An unchanged resource bundle is
+hashed through a fixed buffer without inflating its entries. A changed bundle is size-checked,
+read once for dispatch, and validated without retaining expanded assets. If its content changes
+between the digest check and preparation, the attempt is rejected before dispatch and can be retried.
+
+Reload writes have a separate 10-second deadline; the 120-second result deadline starts only after
+the frame is flushed. A write failure still has an unknown transaction outcome and is never replayed.
+A slow result cannot be mistaken for a blocked write, and a cancelled write timer cannot close the
+later result wait.
+
+`Reload timing` logs use the existing request ID and monotonic local durations. Host stages include
+resource validation, seed/final DEX conversion, preparation total, frame write (wire bytes), result
+wait, device round trip and dispatch-to-render. Device logs separately report UI queue wait and
+execution time. These are diagnostic spans, not an additive breakdown: preparation includes resource
+and DEX work, round trip includes wake/send/wait, and dispatch-to-render may overlap acknowledgement.
+Compilation before the host receives the request is excluded. No host/device clock subtraction or
+performance-speedup claim is made. Render correlation retains at most 64 requests per connection;
+missing or evicted render observations do not change reload success.
