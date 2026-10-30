@@ -4,6 +4,18 @@
 通过；设备结果、源码版本、AAR／APK 哈希及复用依据保留在本地验证记录中。
 不以场景数量计算“兼容率”，也不把安全拒绝或预期异常计为业务调用成功。
 
+## alpha.3 发布范围
+
+alpha.3 包含图片状态保留、后台进程唤醒、受限委托初始化与子组布局状态保留修复，
+以及有界传输、独立写入／结果超时和分阶段诊断。下表涉及 alpha.2 的失败描述是历史结果，
+不是 alpha.3 仍未修复的结论；本版范围与验证摘要见[发布说明](releases/0.1.0-alpha.3.md)。
+
+冻结前最新源码在 API 36 通过 14 项 AndroidView／Compose launcher 检查、7 次重载，
+以及 5 项资源／代码更新检查、3 次重载；83 项主机测试通过。较早的 API 36 运行还覆盖图片、
+生命周期收集、动画和传输故障，按源码影响范围复用，不标成最终发布包的新实测。
+最新公共传输改动未在 API 33 最终产物补验；该设备历史通过项不替代本次缺口。
+ART 引擎继续使用公开 alpha.4，不宣称全设备、全天会话或性能验收完成。
+
 ## 已有端到端入口
 
 先按[真实编辑指南](real-edits.zh-CN.md)发布独立版本的 ART DCEVM AAR 到 Maven Local，
@@ -34,8 +46,8 @@
 | 分页请求等待／失败期间更新，保留当前翻页状态 | `framework/paging-pager`；真实 PagingSource、cachedIn、LazyPagingItems、LazyColumn、HorizontalPager，等待请求／重试的新结果、可见行锚点及页内状态 | 内存数据源与显式等待 gate；不外推 RemoteMediator、网络／数据库分页或全部 Paging 版本 |
 | 动画进行中、手指按住时修改原回调 | `framework/animation-gestures`；Animatable 原对象／帧回调、任务及取消次数，pointerInput 跨更新的同一次 DOWN／MOVE／UP | 单指输入与兼容方法体编辑；不外推任意 Transition、状态机／捕获布局演进或多指竞争 |
 | 切换多个已保存导航栈后编辑当前页面 | `framework/navigation-stacks`；两个嵌套图、各自详情与返回、entry／草稿／计数／滚动状态恢复，活跃页普通 remember 与原 lambda | 正常离开组合树由 rememberSaveable 恢复；不代表 inactive 页的普通 remember 对象存活，不外推深链或任意导航图重构 |
-| 图片请求等待时修改业务和原回调 | `framework/async-images`；Coil 2.7.0 AsyncImage、真实 HTTP PNG、原 request／loader／callback、内存缓存无额外请求、503 与重试、退出释放 | 公开 alpha.2 状态保留检查失败：Effect／具体 client／不可变 requestMode 形式仍由 OkHttpClient 初始化依赖触发整页重置；baseline 只验证未热更新的图片管线，见框架指南；不外推 Coil 3、磁盘缓存、鉴权、变换或真实远端故障 |
-| Compose launcher 的系统文档选择期间更新 | `framework/compose-launcher`；rememberLauncherForActivityResult、系统 OpenDocument、父 Activity 停止期间编辑、URI 内容解码、取消、无重复及新页面注册 | API 36 公开版后台重载应答超时，该设备此组未通过；显式使用已安装的 Google DocumentsUI，provider 只提供生成的测试文件；不外推 OEM 默认选择器、权限、相机、Photo Picker、任意生命周期队列或进程死亡恢复 |
+| 图片请求等待时修改业务和原回调 | `framework/async-images`；Coil 2.7.0 AsyncImage、真实 HTTP PNG、原 request／loader／callback、内存缓存无额外请求、503 与重试、退出释放 | alpha.2 曾因 OkHttpClient 初始化依赖触发整页重置；alpha.3 已修复已覆盖的延迟回调依赖识别，并有 API 36 状态保留回归；真实初始化值变化仍可重置，见框架指南；不外推 Coil 3、磁盘缓存、鉴权、变换或真实远端故障 |
+| Compose launcher 的系统文档选择期间更新 | `framework/compose-launcher`；rememberLauncherForActivityResult、系统 OpenDocument、父 Activity 停止期间编辑、URI 内容解码、取消、无重复及新页面注册 | alpha.2 在 API 36 曾出现后台重载应答超时；alpha.3 唤醒原进程并保留原页面，该设备本组回归通过；显式使用已安装的 Google DocumentsUI，provider 只提供生成的测试文件；不外推 OEM 默认选择器、权限、相机、Photo Picker、任意生命周期队列或进程死亡恢复 |
 | 保留方法引用／匿名对象时修改逻辑和新增捕获 | `framework/method-references`；真实事件注册、原接收者／回调身份、快照与实时数据、GC／前后台、旧新对象对照 | 新捕获字段在旧对象中为默认 null；不外推成员签名变化、任意捕获改型和歧义映射 |
 | 权限弹窗等待时修改业务和原结果回调 | `framework/permission-launcher`；真实 RequestPermission 拒绝／允许、已授权同步结果、普通 remember 页面、精确交付和新注册 | 仅 CAMERA 授权，不打开相机；不覆盖永久拒绝、权限组、通知权限、进程死亡或 Manifest 热更新 |
 | 网络／数据库分页联动时修改映射 | `framework/remote-feed`；真实 HTTP、RemoteMediator、Room 事务与生成 PagingSource，等待／503／重试／刷新、旧页面与可见行状态 | Room 内存数据库与确定性本地 HTTP；不外推磁盘持久化、schema 迁移、鉴权或远端稳定性 |
@@ -64,8 +76,8 @@
 
 | 优先级 | 缺口与当前最接近的覆盖 | 最小补验标准 |
 | --- | --- | --- |
-| P1 | 外部系统选择器在前台时的后台重载：API 36 公开版出现应答超时，根因是原进程被厂商冻结；新的受限 provider 唤醒实现见框架指南，公开版本结论仍保留 | 保留超时及线程证据，对照不热更新流程；新产物须补验原页面／launcher／callback 和后续返回，不能靠重启应用判通过 |
-| P1 | remember 初始化执行依赖精度：图片原夹具和调整为标准生命周期的夹具均出现整页重置，后者指向 OkHttpClient.Builder 构造器，公开版限制仍存在 | 新的操作数来源和调用参数分析见框架指南；保留原失败复现，并补初始化真实变化必须重置的反例，不能仅增加全局忽略名单 |
+| 发布验证边界 | 最新公共传输路径的 API 33 验证暂缓；API 36 的后台 launcher 修复与回归已通过 | API 33 恢复验证时，仅补新公共路径相关的页面状态、后台返回和传输检查；不把 API 36 结果外推成双设备完成 |
+| P2 | remember 初始化依赖的未覆盖形式：已修复图片夹具的延迟回调依赖；反射或擦除为 Object 的外部 API 执行回调仍无专项覆盖 | 在新形式下分别验证延迟回调修改保留状态、真实初始化变化必须重置；不使用全局忽略名单绕过依赖 |
 | P2 | 方法引用／匿名对象的复杂结构演进：新增专项覆盖目标方法体和引用捕获新增，成员签名及捕获改型仍缺失 | 保留 `service::method` 与 `object : Listener`，专项修改成员签名、捕获类型与删除捕获；区分成功、链接错误与拒绝，不能借用 LambdaMetafactory 捕获映射的结论 |
 | P2 | 全天会话与连接故障：已有原 20 轮、主机退出及新增半小时专项入口，设备通过以本地记录为准 | 在固定半小时门槛之外，按发布需要扩展时长／平台；主机 Socket 故障测试已覆盖无应答／半帧、断连、阻塞写入、迟到结果及禁止重复提交；仍需独立验证真实 ADB 中断／恢复，不把主机终止后的新进程称为原进程重连 |
 
@@ -84,7 +96,7 @@
 ## 连接故障与不确定结果
 
 当前源码将连接／握手限制在总计 60 秒内（单次握手最多 5 秒），
-普通控制消息写入最多 10 秒，重载发送及等待应答合计最多 120 秒。
+普通控制消息与重载写入均最多 10 秒；重载帧完整写出后，等待应答另限 120 秒。
 期限覆盖阻塞写入和未完整收到的帧；正常空闲连接没有读超时。
 请求发送前的 provider 唤醒仍由各次 ADB 命令的 60 秒期限控制。
 
