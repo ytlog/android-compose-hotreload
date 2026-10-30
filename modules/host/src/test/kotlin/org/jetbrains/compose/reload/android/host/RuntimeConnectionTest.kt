@@ -3,6 +3,7 @@ package org.jetbrains.compose.reload.android.host
 import org.jetbrains.compose.reload.android.host.device.ReloadOutcomeUnknownException
 import org.jetbrains.compose.reload.android.host.device.RuntimeConnection
 import org.jetbrains.compose.reload.android.protocol.Protocol
+import org.jetbrains.compose.reload.android.protocol.TransportFailure
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.InetAddress
@@ -10,7 +11,6 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
-import java.net.SocketTimeoutException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -41,8 +41,8 @@ class RuntimeConnectionTest {
                 } catch (error: Throwable) { done.completeExceptionally(error) }
             }
         }
-        fun connect(handshake: Long = 2_000, reload: Long = 2_000) = RuntimeConnection.connect(
-            InetSocketAddress(InetAddress.getLoopbackAddress(), server.localPort), "fixture.app", handshake, reload
+        fun connect(handshake: Long = 2_000, reload: Long = 2_000, frame: Long = 120_000) = RuntimeConnection.connect(
+            InetSocketAddress(InetAddress.getLoopbackAddress(), server.localPort), "fixture.app", handshake, reload, frameTimeoutMillis = frame
         )
         override fun close() {
             accepted.getNow(null)?.close()
@@ -59,7 +59,9 @@ class RuntimeConnectionTest {
     @Test
     fun `silent peer cannot stall handshake`() {
         Peer { socket -> Protocol.readHandshake(socket.getInputStream()); assertEquals(-1, socket.getInputStream().read()) }.use {
-            assertFailsWith<SocketTimeoutException> { it.connect(handshake = 150) }
+            val failure = assertFailsWith<TransportFailure> { it.connect(handshake = 150) }
+            assertEquals(TransportFailure.Stage.HANDSHAKE, failure.stage)
+            assertEquals(TransportFailure.Reason.TIMEOUT, failure.reason)
             it.done.get(5, TimeUnit.SECONDS)
         }
     }
@@ -73,7 +75,9 @@ class RuntimeConnectionTest {
             socket.getOutputStream().flush()
             assertEquals(-1, socket.getInputStream().read())
         }.use {
-            assertFailsWith<SocketTimeoutException> { it.connect(handshake = 150) }
+            val failure = assertFailsWith<TransportFailure> { it.connect(handshake = 150) }
+            assertEquals(TransportFailure.Stage.HANDSHAKE, failure.stage)
+            assertEquals(TransportFailure.Reason.TIMEOUT, failure.reason)
             it.done.get(5, TimeUnit.SECONDS)
         }
     }
@@ -174,6 +178,76 @@ class RuntimeConnectionTest {
                 assertFailsWith<ReloadOutcomeUnknownException> { connection.reload(large) }
                 assertFailsWith<ReloadOutcomeUnknownException> { connection.reload(request()) }
                 finish.complete(Unit)
+            }
+        }
+    }
+
+    @Test
+    fun `idle is unlimited but a partial unsolicited event closes with a frame diagnostic`() {
+        val send = CompletableFuture<Unit>()
+        Peer { socket ->
+            hello(socket)
+            send.get(5, TimeUnit.SECONDS)
+            socket.getOutputStream().write(0)
+            socket.getOutputStream().flush()
+            assertEquals(-1, socket.getInputStream().read())
+        }.use { peer ->
+            peer.connect(frame = 150).use { connection ->
+                Thread.sleep(350)
+                connection.ensureUsable()
+                send.complete(Unit)
+                connection.closed.get(5, TimeUnit.SECONDS)
+                val failure = assertFailsWith<TransportFailure> { connection.ensureUsable() }
+                assertEquals(TransportFailure.Stage.READ_FRAME, failure.stage)
+                assertEquals(TransportFailure.Reason.TIMEOUT, failure.reason)
+                assertEquals(null, failure.requestId)
+                peer.done.get(5, TimeUnit.SECONDS)
+            }
+        }
+    }
+
+    @Test
+    fun `frame timeout during a reload preserves unknown outcome and request identity`() {
+        Peer { socket ->
+            hello(socket)
+            Protocol.read(socket.getInputStream())
+            socket.getOutputStream().write(0)
+            socket.getOutputStream().flush()
+            assertEquals(-1, socket.getInputStream().read())
+        }.use { peer ->
+            peer.connect(frame = 150).use { connection ->
+                val error = assertFailsWith<ReloadOutcomeUnknownException> { connection.reload(request()) }
+                val failure = error.cause as TransportFailure
+                assertEquals(TransportFailure.Stage.READ_FRAME, failure.stage)
+                assertEquals(TransportFailure.Reason.TIMEOUT, failure.reason)
+                assertEquals("first", failure.requestId)
+                assertFalse(connection.closed.isDone)
+                peer.done.get(5, TimeUnit.SECONDS)
+            }
+        }
+    }
+
+    @Test
+    fun `oversized local requests send nothing and leave the session reusable`() {
+        val finish = CompletableFuture<Unit>()
+        Peer { socket ->
+            hello(socket)
+            val request = Protocol.read(socket.getInputStream()) as Protocol.Reload
+            assertEquals("small", request.reloadRequestId)
+            Protocol.write(socket.getOutputStream(), result("small"))
+            finish.get(5, TimeUnit.SECONDS)
+        }.use { peer ->
+            peer.connect().use { connection ->
+                val bad = Protocol.Reload("large", emptyList(), listOf("x".repeat(Protocol.MAX_EVENT_SIZE + 1)), intArrayOf())
+                val failure = assertFailsWith<TransportFailure> { connection.reload(bad) }
+                assertEquals(TransportFailure.Stage.ENQUEUE, failure.stage)
+                assertEquals(TransportFailure.Reason.MESSAGE_REJECTED, failure.reason)
+                assertEquals("large", failure.requestId)
+                assertFailsWith<TransportFailure> { connection.send(Protocol.Shutdown("x".repeat(Protocol.MAX_CONTROL_SIZE))) }
+                assertTrue(connection.reload(request("small")).success)
+                connection.ensureUsable()
+                finish.complete(Unit)
+                peer.done.get(5, TimeUnit.SECONDS)
             }
         }
     }

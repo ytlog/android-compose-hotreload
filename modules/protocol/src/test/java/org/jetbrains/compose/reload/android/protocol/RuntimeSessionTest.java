@@ -26,7 +26,12 @@ public class RuntimeSessionTest {
         final CountDownLatch largeWriteStarted = new CountDownLatch(1);
         final CountDownLatch unblock = new CountDownLatch(1);
         volatile boolean blockWrites;
+        final CompletableFuture<TransportFailure> failure = new CompletableFuture<>();
+        final java.util.concurrent.atomic.AtomicInteger failureCount = new java.util.concurrent.atomic.AtomicInteger();
         Peer(long handshake, long frame, long write, int capacity) throws IOException {
+            this(handshake, frame, write, capacity, RuntimeSession.MAX_QUEUED_BYTES);
+        }
+        Peer(long handshake, long frame, long write, int capacity, long byteBudget) throws IOException {
             client.setSoTimeout(5_000);
             server.setSendBufferSize(1024);
             Thread thread = new Thread(() -> {
@@ -48,7 +53,9 @@ public class RuntimeSessionTest {
                     };
                     accepted.complete(RuntimeSession.accept(server.getInputStream(), output, () -> {
                         server.close(); unblock.countDown(); closed.countDown();
-                    }, HELLO, handshake, frame, write, capacity));
+                    }, HELLO, handshake, frame, write, capacity, byteBudget, error -> {
+                        failureCount.incrementAndGet(); failure.complete((TransportFailure) error);
+                    }));
                 } catch (Throwable error) { accepted.completeExceptionally(error); }
             });
             thread.setDaemon(true);
@@ -72,7 +79,9 @@ public class RuntimeSessionTest {
             assertEquals(-1, peer.client.getInputStream().read());
             try { peer.accepted.get(5, TimeUnit.SECONDS); fail("Expected timeout"); }
             catch (java.util.concurrent.ExecutionException expected) {
-                assertTrue(expected.getCause() instanceof SocketTimeoutException);
+                assertTrue(expected.getCause() instanceof TransportFailure);
+                assertEquals(TransportFailure.Stage.HANDSHAKE, ((TransportFailure) expected.getCause()).stage);
+                assertEquals(TransportFailure.Reason.TIMEOUT, ((TransportFailure) expected.getCause()).reason);
             }
         }
     }
@@ -95,7 +104,11 @@ public class RuntimeSessionTest {
             peer.client.getOutputStream().write(0);
             peer.client.getOutputStream().flush();
             try { session.read(); fail("Expected frame timeout"); }
-            catch (SocketTimeoutException expected) { assertTrue(session.isClosed()); }
+            catch (SocketTimeoutException expected) {
+                assertTrue(session.isClosed());
+                assertEquals(TransportFailure.Stage.READ_FRAME, session.failure().stage);
+                assertEquals(TransportFailure.Reason.TIMEOUT, session.failure().reason);
+            }
         }
     }
 
@@ -117,7 +130,7 @@ public class RuntimeSessionTest {
         try (Peer peer = new Peer(500, 500, 1_000, 8)) {
             RuntimeSession session = peer.handshake();
             peer.client.setReceiveBufferSize(1024);
-            String large = new String(new char[8 * 1024 * 1024]).replace('\0', 'x');
+            String large = new String(new char[512 * 1024]).replace('\0', 'x');
             assertTrue(session.send(new Protocol.UIException(large, null)));
             // Callers can continue while the writer is stuck on a real socket.
             assertTrue(session.send(new Protocol.UIRendered("next", 1)));
@@ -125,6 +138,9 @@ public class RuntimeSessionTest {
             assertTrue(peer.closed.await(5, TimeUnit.SECONDS));
             assertTrue(session.isClosed());
             assertFalse(session.send(new Protocol.UIRendered("late", 2)));
+            assertEquals(TransportFailure.Stage.WRITE_FRAME, peer.failure.get(5, TimeUnit.SECONDS).stage);
+            assertEquals(TransportFailure.Reason.TIMEOUT, session.failure().reason);
+            assertEquals(1, peer.failureCount.get());
         }
     }
 
@@ -136,6 +152,8 @@ public class RuntimeSessionTest {
             assertTrue(peer.writing.await(5, TimeUnit.SECONDS));
             assertTrue(session.send(new Protocol.UIRendered("old", 2)));
             assertFalse(session.send(new Protocol.UIRendered("overflow", 3)));
+            assertEquals(TransportFailure.Reason.QUEUE_FULL, session.failure().reason);
+            assertEquals("overflow", session.failure().requestId);
             assertTrue(peer.closed.await(5, TimeUnit.SECONDS));
             try (Peer next = new Peer(500, 500, 500, 8)) {
                 RuntimeSession fresh = next.handshake();
@@ -143,6 +161,37 @@ public class RuntimeSessionTest {
                 assertTrue(fresh.send(new Protocol.UIRendered("new", 1)));
                 assertEquals("new", ((Protocol.UIRendered) Protocol.read(next.client.getInputStream())).reloadRequestId);
             }
+        }
+    }
+
+    @Test(timeout = 10_000) public void byteBudgetCountsTheBlockedInFlightFrameAndReportsOnce() throws Exception {
+        Protocol.UIRendered event = new Protocol.UIRendered("one", 1);
+        long size = Protocol.prepare(event).wireSize();
+        try (Peer peer = new Peer(500, 500, 5_000, 16, size * 2)) {
+            RuntimeSession session = peer.handshake();
+            peer.blockWrites = true;
+            assertTrue(session.send(event));
+            assertTrue(peer.writing.await(5, TimeUnit.SECONDS));
+            assertTrue(session.send(event));
+            assertFalse(session.send(new Protocol.UIRendered("overflow", 2)));
+            TransportFailure failure = peer.failure.get(5, TimeUnit.SECONDS);
+            assertEquals(TransportFailure.Stage.ENQUEUE, failure.stage);
+            assertEquals(TransportFailure.Reason.BYTE_BUDGET, failure.reason);
+            assertEquals("overflow", failure.requestId);
+            assertTrue(failure.detail.contains("retainedBytes=" + size * 2));
+            session.close();
+            assertFalse(session.send(event));
+            assertEquals(1, peer.failureCount.get());
+        }
+    }
+
+    @Test(timeout = 10_000) public void oversizedEventClosesWithExplicitLocalRejectionBeforeAnyFrame() throws Exception {
+        try (Peer peer = new Peer(500, 500, 500, 8)) {
+            RuntimeSession session = peer.handshake();
+            String text = new String(new char[Protocol.MAX_EVENT_SIZE + 1]);
+            assertFalse(session.send(new Protocol.UIException(text, null)));
+            assertEquals(TransportFailure.Reason.MESSAGE_REJECTED, session.failure().reason);
+            assertEquals(-1, peer.client.getInputStream().read());
         }
     }
 }

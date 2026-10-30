@@ -1,7 +1,5 @@
 package org.jetbrains.compose.reload.android.protocol;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -27,7 +25,10 @@ public final class Protocol {
 
     public static final int MAGIC = 0x43485241; // 'CHRA'
     public static final int VERSION = 3;
-    public static final int MAX_FRAME_SIZE = 512 * 1024 * 1024;
+    public static final int MAX_FRAME_SIZE = 64 * 1024 * 1024;
+    public static final int MAX_EVENT_SIZE = 1024 * 1024;
+    public static final int MAX_CONTROL_SIZE = 64 * 1024;
+    public static final int MAX_COLLECTION_SIZE = 65_536;
 
     /* Host -> Device */
     static final int RELOAD = 1;
@@ -133,33 +134,33 @@ public final class Protocol {
 
         @Override void writePayload(DataOutputStream out) throws IOException {
             writeString(out, reloadRequestId);
-            out.writeInt(definitions.size());
+            writeCount(out, definitions.size());
             for (ClassDefinition definition : definitions) {
                 writeString(out, definition.className);
                 writeBytes(out, definition.dex);
                 out.writeBoolean(definition.staticsOnly);
             }
             writeStrings(out, reinitializeStatics);
-            out.writeInt(invalidatedGroupKeys.length);
+            writeCount(out, invalidatedGroupKeys.length);
             for (int key : invalidatedGroupKeys) out.writeInt(key);
             out.writeBoolean(resourceApk != null);
             if (resourceApk != null) writeBytes(out, resourceApk);
-            out.writeInt(recomposedGroupKeys.length);
+            writeCount(out, recomposedGroupKeys.length);
             for (int key : recomposedGroupKeys) out.writeInt(key);
         }
 
         static Reload read(DataInputStream in) throws IOException {
             String id = readString(in);
-            int count = readCount(in);
+            int count = readCount(in, 9);
             List<ClassDefinition> definitions = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 definitions.add(new ClassDefinition(readString(in), readBytes(in), in.readBoolean()));
             }
             List<String> reinitialize = readStrings(in);
-            int[] groups = new int[readCount(in)];
+            int[] groups = new int[readCount(in, 4)];
             for (int i = 0; i < groups.length; i++) groups[i] = in.readInt();
             byte[] resourceApk = in.readBoolean() ? readBytes(in) : null;
-            int[] recompose = new int[readCount(in)];
+            int[] recompose = new int[readCount(in, 4)];
             for (int i = 0; i < recompose.length; i++) recompose[i] = in.readInt();
             return new Reload(id, definitions, reinitialize, groups, resourceApk, recompose);
         }
@@ -320,30 +321,68 @@ public final class Protocol {
         if (version != VERSION) throw new IOException("Unsupported protocol version " + version + " (expected " + VERSION + ")");
     }
 
-    public static void write(OutputStream stream, Message message) throws IOException {
-        ByteArrayOutputStream payload = new ByteArrayOutputStream();
-        message.writePayload(new DataOutputStream(payload));
-        DataOutputStream out = new DataOutputStream(stream);
-        out.writeInt(message.type());
-        out.writeInt(payload.size());
-        payload.writeTo(out);
-        out.flush();
+    /** Preflight without a payload copy. Reject before any frame bytes reach the peer. */
+    public static PreparedMessage prepare(Message message) throws IOException {
+        int limit = payloadLimit(message.type());
+        BoundedOutput counter = new BoundedOutput(null, limit);
+        message.writePayload(new SizingOutput(counter));
+        return new PreparedMessage(message, limit - counter.remaining);
     }
 
-    /** Returns null at the end of the stream */
-    public static Message read(InputStream stream) throws IOException {
-        DataInputStream frame = new DataInputStream(stream);
-        int type;
-        try {
-            type = frame.readInt();
-        } catch (EOFException e) {
-            return null;
+    /** Borrows message fields until writeTo completes; callers must not mutate them while queued. */
+    public static final class PreparedMessage {
+        private final Message message;
+        private final int payloadSize;
+        private PreparedMessage(Message message, int payloadSize) {
+            this.message = message;
+            this.payloadSize = payloadSize;
         }
+        public int wireSize() { return payloadSize + 8; }
+        public String requestId() { return Protocol.requestId(message); }
+        public void writeTo(OutputStream stream) throws IOException {
+            DataOutputStream frame = new DataOutputStream(stream);
+            frame.writeInt(message.type());
+            frame.writeInt(payloadSize);
+            BoundedOutput payload = new BoundedOutput(stream, payloadSize);
+            message.writePayload(new DataOutputStream(payload));
+            if (payload.remaining != 0) throw new IOException("Message changed after preflight");
+            stream.flush();
+        }
+    }
+
+    public static String requestId(Message message) {
+        if (message instanceof Reload) return ((Reload) message).reloadRequestId;
+        if (message instanceof ReloadResult) return ((ReloadResult) message).reloadRequestId;
+        if (message instanceof UIRendered) return ((UIRendered) message).reloadRequestId;
+        return null;
+    }
+
+    public static void write(OutputStream stream, Message message) throws IOException {
+        prepare(message).writeTo(stream);
+    }
+
+    private static int payloadLimit(int type) throws IOException {
+        switch (type) {
+            case RELOAD: return MAX_FRAME_SIZE;
+            case RELOAD_RESULT: case UI_EXCEPTION: return MAX_EVENT_SIZE;
+            case HELLO: case SHUTDOWN: case UI_RENDERED: return MAX_CONTROL_SIZE;
+            case RESET_COMPOSITION: return 1;
+            default: throw new IOException("Unknown message type: " + type);
+        }
+    }
+
+    /** Returns null only at a frame boundary. Partial headers/payloads are truncated frames. */
+    public static Message read(InputStream stream) throws IOException {
+        int first = stream.read();
+        if (first < 0) return null;
+        DataInputStream frame = new DataInputStream(stream);
+        int type = (first << 24) | (frame.readUnsignedByte() << 16)
+            | (frame.readUnsignedByte() << 8) | frame.readUnsignedByte();
         int size = frame.readInt();
-        if (size < 0 || size > MAX_FRAME_SIZE) throw new IOException("Illegal frame size: " + size);
-        byte[] payload = new byte[size];
-        frame.readFully(payload);
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload));
+        int limit = payloadLimit(type);
+        if (size < 0 || size > limit) throw new IOException("Frame size " + size + " exceeds type " + type + " limit " + limit);
+        // Parse directly from a bounded view, retaining only the actual fields (DEX/resources included).
+        DataInputStream in = new DataInputStream(new PayloadInput(stream, size));
         Message message;
         switch (type) {
             case RELOAD: message = Reload.read(in); break;
@@ -361,10 +400,15 @@ public final class Protocol {
 
     /* Encoding */
 
-    private static int readCount(DataInputStream in) throws IOException {
+    private static void writeCount(DataOutputStream out, int count) throws IOException {
+        if (count < 0 || count > MAX_COLLECTION_SIZE) throw new IOException("Illegal element count: " + count);
+        out.writeInt(count);
+    }
+
+    private static int readCount(DataInputStream in, int minimumBytes) throws IOException {
         int count = in.readInt();
-        /* Every element needs at least one byte: the remaining payload bounds any count */
-        if (count < 0 || count > in.available()) throw new IOException("Illegal element count: " + count);
+        if (count < 0 || count > MAX_COLLECTION_SIZE || count > in.available() / minimumBytes)
+            throw new IOException("Illegal element count: " + count);
         return count;
     }
 
@@ -373,20 +417,80 @@ public final class Protocol {
         out.write(bytes);
     }
 
-    private static byte[] readBytes(DataInputStream in) throws IOException {
+    private static byte[] readBytes(DataInputStream in) throws IOException { return readBytes(in, MAX_FRAME_SIZE); }
+
+    private static byte[] readBytes(DataInputStream in, int limit) throws IOException {
         int size = in.readInt();
-        if (size < 0 || size > in.available()) throw new IOException("Illegal byte array size: " + size);
+        if (size < 0 || size > limit || size > in.available()) throw new IOException("Illegal byte array size: " + size);
         byte[] bytes = new byte[size];
         in.readFully(bytes);
         return bytes;
     }
 
     private static void writeString(DataOutputStream out, String value) throws IOException {
-        writeBytes(out, value.getBytes(StandardCharsets.UTF_8));
+        // String.getBytes would allocate before a counting stream could reject an oversized value.
+        int size = utf8Size(value);
+        out.writeInt(size);
+        if (out instanceof SizingOutput) ((SizingOutput) out).counter.write(null, 0, size);
+        else out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static int utf8Size(String value) throws IOException {
+        if (value.length() > MAX_EVENT_SIZE) throw new IOException("String exceeds byte limit " + MAX_EVENT_SIZE);
+        int size = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x80) size++;
+            else if (c < 0x800) size += 2;
+            else if (Character.isHighSurrogate(c) && i + 1 < value.length() && Character.isLowSurrogate(value.charAt(i + 1))) {
+                size += 4; i++;
+            } else size += Character.isSurrogate(c) ? 1 : 3; // UTF-8 encoder replaces malformed input with '?'.
+            if (size > MAX_EVENT_SIZE) throw new IOException("String exceeds byte limit " + MAX_EVENT_SIZE);
+        }
+        return size;
     }
 
     private static String readString(DataInputStream in) throws IOException {
-        return new String(readBytes(in), StandardCharsets.UTF_8);
+        return new String(readBytes(in, MAX_EVENT_SIZE), StandardCharsets.UTF_8);
+    }
+
+    private static final class SizingOutput extends DataOutputStream {
+        final BoundedOutput counter;
+        SizingOutput(BoundedOutput counter) { super(counter); this.counter = counter; }
+    }
+
+    private static final class BoundedOutput extends OutputStream {
+        final OutputStream target;
+        int remaining;
+        BoundedOutput(OutputStream target, int size) { this.target = target; remaining = size; }
+        private void reserve(int count) throws IOException {
+            if (count < 0 || count > remaining) throw new IOException("Payload exceeds byte budget; remaining=" + remaining + ", requested=" + count);
+            remaining -= count;
+        }
+        @Override public void write(int value) throws IOException { reserve(1); if (target != null) target.write(value); }
+        @Override public void write(byte[] bytes, int offset, int size) throws IOException {
+            reserve(size); if (target != null) target.write(bytes, offset, size);
+        }
+    }
+
+    private static final class PayloadInput extends InputStream {
+        final InputStream source;
+        int remaining;
+        PayloadInput(InputStream source, int size) { this.source = source; remaining = size; }
+        @Override public int available() { return remaining; }
+        @Override public int read() throws IOException {
+            if (remaining == 0) return -1;
+            int value = source.read();
+            if (value < 0) throw new EOFException("Truncated frame payload");
+            remaining--; return value;
+        }
+        @Override public int read(byte[] bytes, int offset, int size) throws IOException {
+            if (size == 0) return 0;
+            if (remaining == 0) return -1;
+            int count = source.read(bytes, offset, Math.min(size, remaining));
+            if (count < 0) throw new EOFException("Truncated frame payload");
+            remaining -= count; return count;
+        }
     }
 
     private static void writeNullableString(DataOutputStream out, String value) throws IOException {
@@ -399,12 +503,12 @@ public final class Protocol {
     }
 
     private static void writeStrings(DataOutputStream out, List<String> values) throws IOException {
-        out.writeInt(values.size());
+        writeCount(out, values.size());
         for (String value : values) writeString(out, value);
     }
 
     private static List<String> readStrings(DataInputStream in) throws IOException {
-        int count = readCount(in);
+        int count = readCount(in, 4);
         List<String> values = new ArrayList<>(count);
         for (int i = 0; i < count; i++) values.add(readString(in));
         return Collections.unmodifiableList(values);
@@ -413,7 +517,7 @@ public final class Protocol {
     private static void writeFrames(DataOutputStream out, List<StackFrame> frames) throws IOException {
         out.writeBoolean(frames != null);
         if (frames == null) return;
-        out.writeInt(frames.size());
+        writeCount(out, frames.size());
         for (StackFrame frame : frames) {
             writeString(out, frame.className);
             writeString(out, frame.methodName);
@@ -424,7 +528,7 @@ public final class Protocol {
 
     private static List<StackFrame> readFrames(DataInputStream in) throws IOException {
         if (!in.readBoolean()) return null;
-        int count = readCount(in);
+        int count = readCount(in, 13);
         List<StackFrame> frames = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             frames.add(new StackFrame(readString(in), readString(in), readNullableString(in), in.readInt()));

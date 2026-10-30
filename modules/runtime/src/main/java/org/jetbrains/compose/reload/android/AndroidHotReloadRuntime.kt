@@ -92,7 +92,7 @@ internal object AndroidHotReloadRuntime {
         }
         RuntimeSession.accept(socket.inputStream, socket.outputStream, transport,
             Protocol.Hello(Protocol.VERSION, Process.myPid(), application.packageName, runtimeError),
-            { error -> Log.w(TAG, "Runtime writer disconnected", error) }
+            { error -> Log.w(TAG, "Runtime transport disconnected", error) }
         ).use { session ->
             connection = session
             Log.i(TAG, "Compose Hot Reload host connected")

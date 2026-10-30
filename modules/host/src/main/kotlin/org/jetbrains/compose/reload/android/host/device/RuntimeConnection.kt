@@ -2,13 +2,16 @@ package org.jetbrains.compose.reload.android.host.device
 
 import org.jetbrains.compose.reload.android.protocol.Protocol
 import org.jetbrains.compose.reload.android.protocol.IoDeadline
+import org.jetbrains.compose.reload.android.protocol.TransportFailure
+import org.jetbrains.compose.reload.android.protocol.TransportFailure.Stage.*
+import org.jetbrains.compose.reload.android.protocol.TransportFailure.Reason.*
 import org.jetbrains.compose.reload.core.createLogger
 import org.jetbrains.compose.reload.core.error
 import java.io.Closeable
 import java.io.IOException
+import java.io.PushbackInputStream
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.net.SocketTimeoutException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ScheduledThreadPoolExecutor
@@ -24,7 +27,7 @@ private val deadlines = ScheduledThreadPoolExecutor(1) { runnable ->
 internal class ReloadOutcomeUnknownException(cause: Throwable) : IOException(
     "Reload outcome is unknown: the runtime may already have applied the change. " +
         "The application is left running, and further requests on this session are disabled. " +
-        "Start a new hot reload session before submitting more changes.", cause
+        "Start a new hot reload session before submitting more changes. ${cause.message}", cause
 )
 
 /** Transport deadlines include writes and partial frames; idle connections have no read timeout. */
@@ -33,6 +36,7 @@ internal class RuntimeConnection private constructor(
     val hello: Protocol.Hello,
     private val reloadTimeoutMillis: Long,
     private val writeTimeoutMillis: Long,
+    private val frameTimeoutMillis: Long,
 ) : Closeable {
     private val output = socket.getOutputStream().buffered()
     private val state = Any()
@@ -47,9 +51,15 @@ internal class RuntimeConnection private constructor(
     init {
         thread(name = "Android Hot Reload: Device Reader", isDaemon = true) {
             try {
-                val input = socket.getInputStream().buffered()
+                val input = PushbackInputStream(socket.getInputStream().buffered(), 1)
                 while (true) {
-                    val message = Protocol.read(input) ?: throw IOException("Runtime connection closed")
+                    val first = input.read()
+                    if (first < 0) throw TransportFailure(READ_FRAME, PEER_CLOSED, null, "EOF at frame boundary", null)
+                    input.unread(first)
+                    val message = IoDeadline.run({
+                        fail(TransportFailure(READ_FRAME, TIMEOUT, null, "deadline=${frameTimeoutMillis}ms", null))
+                    }, frameTimeoutMillis, "Runtime frame deadline=${frameTimeoutMillis}ms") { Protocol.read(input) }
+                        ?: throw IOException("Truncated runtime frame")
                     if (message is Protocol.ReloadResult) {
                         synchronized(state) { pending.remove(message.reloadRequestId)?.complete(message) }
                     } else {
@@ -61,7 +71,8 @@ internal class RuntimeConnection private constructor(
                     }
                 }
             } catch (error: Exception) {
-                fail(IOException("Runtime connection lost", error))
+                fail(if (error is TransportFailure) error else TransportFailure.io(READ_FRAME, null,
+                    if (error is IOException) error else IOException(error)))
             }
         }
     }
@@ -74,31 +85,35 @@ internal class RuntimeConnection private constructor(
 
     private fun fail(error: IOException) = synchronized(state) {
         if (failure != null) return@synchronized
-        val terminal = if (pending.isNotEmpty()) ReloadOutcomeUnknownException(error) else error
+        val contextual = if (error is TransportFailure && error.requestId == null && pending.isNotEmpty())
+            error.withRequestId(pending.keys.single()) else error
+        val terminal = if (pending.isNotEmpty()) ReloadOutcomeUnknownException(contextual) else contextual
         failure = terminal
         pending.values.forEach { it.completeExceptionally(terminal) }
         pending.clear()
         runCatching { socket.close() }
         if (terminal !is ReloadOutcomeUnknownException) closed.complete(Unit)
+        if (contextual !is TransportFailure || contextual.reason != LOCAL_CLOSE) connectionLogger.error(contextual.message ?: "Runtime transport failed")
     }
 
     fun send(message: Protocol.Message) {
         require(message !is Protocol.Reload) { "Reloads require acknowledgement tracking" }
         ensureUsable()
+        val prepared = prepare(message)
         var finished = false
         val deadline = deadlines.schedule({
             synchronized(state) {
-                if (!finished) fail(SocketTimeoutException("Runtime write timed out"))
+                if (!finished) fail(TransportFailure(WRITE_FRAME, TIMEOUT, prepared.requestId(), "deadline=${writeTimeoutMillis}ms", null))
             }
         }, writeTimeoutMillis, TimeUnit.MILLISECONDS)
         try {
             synchronized(output) {
                 ensureUsable()
-                Protocol.write(output, message)
+                prepared.writeTo(output)
             }
             ensureUsable()
         } catch (error: IOException) {
-            fail(error)
+            fail(TransportFailure.io(WRITE_FRAME, prepared.requestId(), error))
             ensureUsable()
         } finally {
             synchronized(state) { finished = true }
@@ -106,7 +121,16 @@ internal class RuntimeConnection private constructor(
         }
     }
 
+    private fun prepare(message: Protocol.Message): Protocol.PreparedMessage = try {
+        Protocol.prepare(message)
+    } catch (error: IOException) {
+        // Local rejection: no frame was sent, so the session remains reusable.
+        throw TransportFailure(ENQUEUE, MESSAGE_REJECTED, Protocol.requestId(message), error.message, error)
+    }
+
     fun reload(request: Protocol.Reload): Protocol.ReloadResult {
+        ensureUsable()
+        val prepared = prepare(request)
         val reply = CompletableFuture<Protocol.ReloadResult>()
         synchronized(state) {
             ensureUsable()
@@ -116,20 +140,20 @@ internal class RuntimeConnection private constructor(
         val deadline = deadlines.schedule({
             synchronized(state) {
                 if (pending[request.reloadRequestId] === reply) {
-                    fail(SocketTimeoutException("Reload '${request.reloadRequestId}' timed out"))
+                    fail(TransportFailure(RELOAD, TIMEOUT, request.reloadRequestId, "deadline=${reloadTimeoutMillis}ms", null))
                 }
             }
         }, reloadTimeoutMillis, TimeUnit.MILLISECONDS)
         try {
             synchronized(output) {
                 ensureUsable()
-                Protocol.write(output, request)
+                prepared.writeTo(output)
             }
             return reply.get()
         } catch (error: ExecutionException) {
             throw error.cause ?: error
         } catch (error: Exception) {
-            fail(IOException("Reload exchange interrupted", error))
+            fail(TransportFailure(RELOAD, IO_FAILURE, request.reloadRequestId, "exchange interrupted", error))
             if (error is InterruptedException) Thread.currentThread().interrupt()
             ensureUsable()
             throw error
@@ -139,7 +163,7 @@ internal class RuntimeConnection private constructor(
     }
 
     override fun close() {
-        fail(IOException("Runtime connection closed by host"))
+        fail(TransportFailure(CLOSE, LOCAL_CLOSE, null, "host closed session", null))
         closed.complete(Unit)
     }
 
@@ -150,11 +174,12 @@ internal class RuntimeConnection private constructor(
             handshakeTimeoutMillis: Long,
             reloadTimeoutMillis: Long = 120_000,
             writeTimeoutMillis: Long = 10_000,
+            frameTimeoutMillis: Long = 120_000,
         ): RuntimeConnection {
-            require(handshakeTimeoutMillis > 0 && reloadTimeoutMillis > 0 && writeTimeoutMillis > 0)
+            require(handshakeTimeoutMillis > 0 && reloadTimeoutMillis > 0 && writeTimeoutMillis > 0 && frameTimeoutMillis > 0)
             val socket = Socket()
             try {
-                val hello = IoDeadline.run(socket, handshakeTimeoutMillis, "Runtime handshake") {
+                val hello = IoDeadline.run(socket, handshakeTimeoutMillis, "Runtime handshake deadline=${handshakeTimeoutMillis}ms") {
                     socket.connect(address, handshakeTimeoutMillis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                     Protocol.writeHandshake(socket.getOutputStream())
                     Protocol.readHandshake(socket.getInputStream())
@@ -165,10 +190,10 @@ internal class RuntimeConnection private constructor(
                     }
                     hello
                 }
-                return RuntimeConnection(socket, hello, reloadTimeoutMillis, writeTimeoutMillis)
+                return RuntimeConnection(socket, hello, reloadTimeoutMillis, writeTimeoutMillis, frameTimeoutMillis)
             } catch (error: Exception) {
                 socket.close()
-                throw error
+                throw if (error is IOException) TransportFailure.io(HANDSHAKE, null, error) else error
             }
         }
     }

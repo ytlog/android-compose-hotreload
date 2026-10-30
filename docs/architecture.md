@@ -117,15 +117,36 @@ An unusable session rejects new work before DEX preparation; uncertain transacti
 automatically replayed.
 
 Host and device handshakes share `IoDeadline`, covering blocking I/O and trickled input. The
-device handshake allows 5 seconds. Idle reads have no timeout; a frame must complete within
-120 seconds of its first byte. A dedicated writer sends queued messages in order, allowing
+device handshake allows 5 seconds. Idle reads on both sides have no timeout; a frame must complete
+within 120 seconds of its first byte. This includes unsolicited UI events on the host. A dedicated writer sends queued messages in order, allowing
 10 seconds per write. Compose render / error callbacks enqueue instead of writing to the socket.
-The queue holds at most 256 messages. Overflow or a failed write disconnects rather than silently
+The queue holds at most 256 waiting messages and 4 MiB of encoded bytes, including the frame
+currently being written. Byte capacity is returned only after that write finishes. Overflow or a failed write disconnects rather than silently
 dropping a reload acknowledgement. Closing clears the old queue; each connection owns a new
 queue. The Android adapter shuts down both local-socket directions before closing the descriptor.
 Device timers cannot run while Android freezes the process. Before sending a reload or reset,
 the host pings the existing runtime through its debug provider and verifies the same PID; this
 wakes the process without launching an Activity or replacing page state.
+
+Payloads are preflighted before sending and streamed through bounded readers/writers without a
+second full-frame buffer. Limits exclude the 8-byte frame header:
+
+| Payload | Limit |
+| --- | --- |
+| Reload, including DEX and resource APK | 64 MiB |
+| Reload result or UI exception | 1 MiB |
+| Hello, shutdown or UI rendered event | 64 KiB |
+| Reset composition | 1 byte |
+
+Strings are limited to 1 MiB of UTF-8; collections and group-key arrays to 65,536 entries. The
+receiver validates the type/size before reading the body and checks nested lengths before allocating.
+A locally oversized host request sends no bytes and leaves the session usable. Reduce the update
+or start a fresh session to install it; a resource APK above the limit cannot be hot-reloaded as-is.
+These are allocation safeguards, not a guarantee against application-wide memory exhaustion.
+
+Disconnect diagnostics identify the stage and reason (for example `READ_FRAME/TIMEOUT`,
+`WRITE_FRAME/TIMEOUT`, `ENQUEUE/QUEUE_FULL` or `ENQUEUE/BYTE_BUDGET`). Request IDs are included
+when known, with deadline/budget details and no message payload. The first device failure is retained; the failure callback runs once. A host rejection before sending is distinct from an unknown outcome after dispatch.
 
 Protocol 3 framing, upstream sources, ART redefinition transactions and application state models
 are unchanged. Releasing a connection does not prove rollback; the host does not reconnect and retry
@@ -139,9 +160,9 @@ python3 tools/runtime-transport-test.py --serial DEVICE_SELECTOR --device-id api
 ```
 
 The tool does not install, uninstall or restart the app. It checks silent / partial handshakes,
-idle followed by a partial frame, and a subsequent handshake, preserving the original PID and
+idle followed by a partial frame, oversized reload/reset headers, and a subsequent handshake, preserving the original PID and
 APK hash. The partial-frame check uses the production 120-second deadline. Use
-`--case partial-frame` or `--case handshake` to narrow a failed run. The tool requires the fixture
+`--case partial-frame`, `--case handshake` or `--case payload-limit` to narrow a failed run. The tool requires the fixture
 to stay in the foreground and records a foreground/process change as an invalid run. These checks do not
 replace real-page state, compilation / resource, JNI-mode or full device-matrix acceptance.
 Raw evidence stays in the ignored local evidence directory. Each run requires a new output

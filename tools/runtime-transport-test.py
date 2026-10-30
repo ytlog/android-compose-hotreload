@@ -62,7 +62,7 @@ def main():
     parser.add_argument('--device-id', required=True)
     parser.add_argument('--package', default='dev.compose.hotreload.framework')
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--case', choices=['all', 'handshake', 'partial-frame'], default='all')
+    parser.add_argument('--case', choices=['all', 'handshake', 'partial-frame', 'payload-limit'], default='all')
     args = parser.parse_args()
     try:
         args.output.resolve().relative_to(Path(__file__).resolve().parents[1] / 'build/evidence')
@@ -144,6 +144,16 @@ def main():
                     report['partialFrameSeconds'] = round(time.monotonic() - started, 3)
                 assert report['partialFrameSeconds'] >= 110, 'Idle or a stale handshake timer closed the session prematurely'
             passed(stage)
+        if args.case in ('all', 'payload-limit'):
+            # Only headers are sent: rejection must precede body allocation or any reset/reload.
+            for kind, size, name in [(1, 64 * 1024 * 1024 + 1, 'oversized-reload-header-rejected'),
+                                     (2, 2, 'oversized-reset-header-rejected')]:
+                stage = name
+                with connect() as connection:
+                    hello(connection, args.package, pid)
+                    connection.sendall(struct.pack('>ii', kind, size))
+                    await_close(connection, 10, check_environment)
+                passed(stage)
         stage = 'subsequent-handshake-same-process'
         with connect() as connection:
             hello(connection, args.package, pid)
