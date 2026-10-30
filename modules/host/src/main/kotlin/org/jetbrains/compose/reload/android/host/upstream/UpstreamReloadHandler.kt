@@ -34,7 +34,8 @@ private val logger = createLogger()
 
 /**
  * Port of the upstream agent's 'reloadRequestHandler.kt':
- * Requests are handled one after another; changes of failed requests are kept and retried with the next request.
+ * Requests are handled one after another; changes of rejected requests are kept for the next request.
+ * An uncertain transport outcome disables the device session, preventing replay with a stale index.
  */
 internal fun launchReloadRequestHandler(index: ApplicationIndex, dexer: Dexer, device: Device, resources: ResourceIndex) = launchTask {
     var pendingChanges = mapOf<File, ClassChange>()

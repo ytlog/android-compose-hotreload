@@ -2,16 +2,13 @@ package org.jetbrains.compose.reload.android.host.device
 
 import org.jetbrains.compose.reload.android.protocol.Protocol
 import org.jetbrains.compose.reload.core.createLogger
-import org.jetbrains.compose.reload.core.debug
-import org.jetbrains.compose.reload.core.error
 import org.jetbrains.compose.reload.core.info
 import org.jetbrains.compose.reload.core.warn
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.InetAddress
-import java.net.Socket
-import java.util.concurrent.CompletableFuture
+import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -42,67 +39,29 @@ internal fun socketName(applicationId: String) = "$applicationId.compose-hot-rel
  * Requests are sent by the host; the device answers reloads and reports UI events.
  */
 internal class Device private constructor(
-    private val socket: Socket,
-    val hello: Protocol.Hello,
+    private val connection: RuntimeConnection,
     private val adb: Adb,
 ) {
-    private val output = socket.getOutputStream().buffered()
-    private val pendingReloads = HashMap<String, CompletableFuture<Protocol.ReloadResult>>()
-    private val listeners = mutableListOf<(Protocol.Message) -> Unit>()
+    val hello: Protocol.Hello get() = connection.hello
+    val closed get() = connection.closed
 
-    /** Completes once the application process is gone (or the connection is lost) */
-    val closed = CompletableFuture<Unit>()
-
-    private fun startReading() = thread(name = "Android Hot Reload: Device Reader", isDaemon = true) {
-        try {
-            val input = socket.getInputStream().buffered()
-            while (true) {
-                val message = Protocol.read(input) ?: break
-                when (message) {
-                    is Protocol.ReloadResult -> synchronized(pendingReloads) {
-                        pendingReloads.remove(message.reloadRequestId)
-                    }?.complete(message)
-                    else -> synchronized(listeners) { listeners.toList() }.forEach { listener ->
-                        try {
-                            listener(message)
-                        } catch (t: Throwable) {
-                            logger.error("Failed handling '${message.javaClass.simpleName}'", t)
-                        }
-                    }
-                }
-            }
-        } catch (e: IOException) {
-            logger.debug("Device connection closed: ${e.message}")
-        } finally {
-            val failure = IOException("The application process '${hello.packageName}' (pid ${hello.pid}) disconnected")
-            synchronized(pendingReloads) { pendingReloads.values.toList().also { pendingReloads.clear() } }
-                .forEach { it.completeExceptionally(failure) }
-            closed.complete(Unit)
-        }
-    }
-
-    fun onMessage(listener: (Protocol.Message) -> Unit) {
-        synchronized(listeners) { listeners.add(listener) }
-    }
+    fun onMessage(listener: (Protocol.Message) -> Unit) = connection.onMessage(listener)
 
     fun send(message: Protocol.Message) {
-        if (message is Protocol.Reload || message is Protocol.ResetComposition) {
-            wakeRuntime(hello.packageName, hello.pid) { arguments -> adb.run(*arguments.toTypedArray()) }
-        }
-        synchronized(output) { Protocol.write(output, message) }
+        connection.ensureUsable()
+        if (message is Protocol.ResetComposition) wake()
+        connection.send(message)
     }
 
-    /** Blocks until the device executed the reload (like the agent blocks 'reloadMain' while reloading) */
+    private fun wake() {
+        wakeRuntime(hello.packageName, hello.pid) { arguments -> adb.run(*arguments.toTypedArray()) }
+    }
+
     fun reload(reload: Protocol.Reload): Protocol.ReloadResult {
-        val result = CompletableFuture<Protocol.ReloadResult>()
-        synchronized(pendingReloads) { pendingReloads[reload.reloadRequestId] = result }
-        try {
-            send(reload)
-        } catch (failure: Throwable) {
-            synchronized(pendingReloads) { pendingReloads.remove(reload.reloadRequestId) }
-            throw failure
-        }
-        val reply = result.get()
+        connection.ensureUsable()
+        // Wakeup fails before dispatch, so it cannot create an uncertain transaction.
+        wake()
+        val reply = connection.reload(reload)
         /* Policy rejections include lastRejection directly. Some ART checks only explain themselves in logcat. */
         if (!reply.success && reply.errorMessage?.contains("FAILURE TO REDEFINE") == true) {
             val detail = runCatching {
@@ -119,7 +78,7 @@ internal class Device private constructor(
     }
 
     fun close() {
-        runCatching { socket.close() }
+        connection.close()
     }
 
     companion object {
@@ -146,18 +105,19 @@ internal class Device private constructor(
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
             var lastFailure: Throwable? = null
             while (System.nanoTime() < deadline) {
-                val socket = Socket(InetAddress.getLoopbackAddress(), port)
+                val remainingMillis = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
+                if (remainingMillis <= 0) break
                 try {
-                    Protocol.writeHandshake(socket.getOutputStream())
-                    Protocol.readHandshake(socket.getInputStream())
-                    val hello = Protocol.read(socket.getInputStream()) as? Protocol.Hello
-                        ?: throw IOException("Expected 'Hello'")
-                    logger.info("Connected to '${hello.packageName}' (pid ${hello.pid})")
-                    return Device(socket, hello, adb).apply { startReading() }
+                    val connection = RuntimeConnection.connect(
+                        InetSocketAddress(InetAddress.getLoopbackAddress(), port), applicationId,
+                        handshakeTimeoutMillis = minOf(5_000, remainingMillis),
+                    )
+                    logger.info("Connected to '${connection.hello.packageName}' (pid ${connection.hello.pid})")
+                    return Device(connection, adb)
                 } catch (t: IOException) {
                     lastFailure = t
-                    socket.close()
-                    Thread.sleep(250)
+                    val pause = minOf(250, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime()))
+                    if (pause > 0) Thread.sleep(pause)
                 }
             }
             throw IOException("Failed to connect to '$applicationId'. Is the app built with the hot reload runtime?", lastFailure)

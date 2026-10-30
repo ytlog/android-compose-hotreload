@@ -20,7 +20,8 @@ private val logger = createLogger()
 
 /**
  * Takes the place of the upstream agent's 'premain' for an application running on an Android device.
- * The lifetime of this process mirrors the lifetime of the application process.
+ * A connected session follows the application lifetime. An uncertain reload keeps orchestration
+ * available for diagnostics while disabling further requests and preserving the application.
  */
 fun main() {
     val config = HostConfig.load()
@@ -47,6 +48,6 @@ fun main() {
     launchReloadRequestHandler(index, dexer, device, resources)
 
     device.closed.get()
-    logger.info("Application '${config.applicationId}' (pid ${device.hello.pid}) exited")
+    logger.info("Connection to '${config.applicationId}' (pid ${device.hello.pid}) closed")
     exitProcess(0)
 }
