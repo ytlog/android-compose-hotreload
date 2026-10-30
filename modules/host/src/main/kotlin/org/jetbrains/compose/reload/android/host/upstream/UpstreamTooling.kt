@@ -8,6 +8,7 @@ import org.jetbrains.compose.reload.core.HotReloadEnvironment
 import org.jetbrains.compose.reload.core.invokeOnValue
 import org.jetbrains.compose.reload.core.withType
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessageId
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.CleanCompositionRequest
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.RetryFailedCompositionRequest
 
@@ -17,23 +18,7 @@ internal object UpstreamTooling {
 
     fun attach(device: Device) {
         device.onMessage { message ->
-            when (message) {
-                is Protocol.UIRendered -> OrchestrationMessage.UIRendered(
-                    windowId = null,
-                    reloadRequestId = message.reloadRequestId?.let { reloadRequestIds[it] },
-                    iteration = message.iteration,
-                ).sendAsync()
-
-                is Protocol.UIException -> OrchestrationMessage.UIException(
-                    windowId = null,
-                    message = message.message,
-                    stacktrace = message.stacktrace.orEmpty().map { frame ->
-                        StackTraceElement(frame.className, frame.methodName, frame.fileName, frame.lineNumber)
-                    }
-                ).sendAsync()
-
-                else -> Unit
-            }
+            message.toToolingMessage()?.sendAsync()
         }
 
         /* upstream 'DevelopmentEntryPoint': both requests reset the composition */
@@ -45,3 +30,22 @@ internal object UpstreamTooling {
         }
     }
 }
+
+internal fun Protocol.Message.toToolingMessage(): OrchestrationMessage? =
+    when (this) {
+        is Protocol.UIRendered -> OrchestrationMessage.UIRendered(
+            windowId = null,
+            reloadRequestId = reloadRequestId?.let { OrchestrationMessageId(it.encodeToByteArray()) },
+            iteration = iteration,
+        )
+
+        is Protocol.UIException -> OrchestrationMessage.UIException(
+            windowId = null,
+            message = message,
+            stacktrace = stacktrace.orEmpty().map { frame ->
+                StackTraceElement(frame.className, frame.methodName, frame.fileName, frame.lineNumber)
+            }
+        )
+
+        else -> null
+    }

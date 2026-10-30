@@ -25,9 +25,7 @@ import org.jetbrains.compose.reload.orchestration.OrchestrationMessage
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.ReloadClassesRequest
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.InvalidatedComposeGroupMessage
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.InvalidatedComposeGroupMessage.DirtyScope
-import org.jetbrains.compose.reload.orchestration.OrchestrationMessageId
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import org.jetbrains.compose.reload.orchestration.OrchestrationMessage.InvalidatedComposeGroupMessage.DirtyScope.ScopeType as DirtyScopeType
 
 private val logger = createLogger()
@@ -44,9 +42,7 @@ internal fun launchReloadRequestHandler(index: ApplicationIndex, dexer: Dexer, d
         pendingChanges = pendingChanges + request.changedClassFiles.mapValues { (_, change) -> ClassChange.valueOf(change.name) }
 
         val context = Context(ReloadClassesRequest with request)
-        val result = context.reload(index, dexer, device, pendingChanges, resources) { deviceRequestId ->
-            reloadRequestIds[deviceRequestId] = request.messageId
-        }
+        val result = context.reload(index, dexer, device, pendingChanges, resources, request.messageId)
 
         if (result.isSuccess()) {
             logger.debug("Reloaded classes: ${request.messageId}")
@@ -66,9 +62,6 @@ internal fun launchReloadRequestHandler(index: ApplicationIndex, dexer: Dexer, d
         }
     }
 }
-
-/** Orchestration ids of reload requests, keyed by the (opaque) id sent to the device */
-internal val reloadRequestIds = ConcurrentHashMap<String, OrchestrationMessageId>()
 
 /** Port of the upstream agent's 'compose.kt' after-reload listener */
 private fun sendInvalidatedComposeGroups(dirty: ResolvedDirtyScopes) {

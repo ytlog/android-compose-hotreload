@@ -15,7 +15,8 @@ import android.os.Bundle
 import android.util.Log
 import org.jetbrains.compose.reload.android.protocol.Protocol
 import java.io.IOException
-import java.io.OutputStream
+import java.io.Closeable
+import org.jetbrains.compose.reload.android.protocol.RuntimeSession
 import kotlin.concurrent.thread
 
 internal const val TAG = "ComposeHotReload"
@@ -29,7 +30,7 @@ internal object AndroidHotReloadRuntime {
     private const val ROOT_UID = 0
 
     @Volatile
-    private var connection: OutputStream? = null
+    private var connection: RuntimeSession? = null
     private var started = false
 
     @Synchronized
@@ -83,47 +84,46 @@ internal object AndroidHotReloadRuntime {
             return
         }
 
-        val input = socket.inputStream.buffered()
-        val output = socket.outputStream.buffered()
-        Protocol.readHandshake(input)
-        Protocol.writeHandshake(output)
-        synchronized(output) {
-            Protocol.write(output, Protocol.Hello(Protocol.VERSION, Process.myPid(), application.packageName, runtimeError))
+        val transport = Closeable {
+            // Shutdown interrupts blocked local-socket I/O before releasing its descriptor.
+            runCatching { socket.shutdownInput() }
+            runCatching { socket.shutdownOutput() }
+            socket.close()
         }
-        connection = output
-        Log.i(TAG, "Compose Hot Reload host connected")
-
-        while (true) {
-            when (val message = Protocol.read(input) ?: return) {
-                is Protocol.Reload -> {
-                    val result = if (runtimeError != null) {
-                        Protocol.ReloadResult(message.reloadRequestId, false, false, false, runtimeError, null)
-                    } else {
-                        executeReload(application.classLoader, application.codeCacheDir, message)
+        RuntimeSession.accept(socket.inputStream, socket.outputStream, transport,
+            Protocol.Hello(Protocol.VERSION, Process.myPid(), application.packageName, runtimeError),
+            { error -> Log.w(TAG, "Runtime writer disconnected", error) }
+        ).use { session ->
+            connection = session
+            Log.i(TAG, "Compose Hot Reload host connected")
+            while (true) {
+                when (val message = session.read() ?: return) {
+                    is Protocol.Reload -> {
+                        val result = if (runtimeError != null) {
+                            Protocol.ReloadResult(message.reloadRequestId, false, false, false, runtimeError, null)
+                        } else {
+                            executeReload(application.classLoader, application.codeCacheDir, message)
+                        }
+                        if (!session.send(result)) return
                     }
-                    send(result)
+
+                    is Protocol.ResetComposition -> resetComposition(application.classLoader, message.hardReset)
+
+                    is Protocol.Shutdown -> {
+                        Log.i(TAG, "Received shutdown request '${message.reason}'")
+                        Process.killProcess(Process.myPid())
+                    }
+
+                    else -> Log.w(TAG, "Unexpected message: ${message.javaClass.simpleName}")
                 }
-
-                is Protocol.ResetComposition -> resetComposition(application.classLoader, message.hardReset)
-
-                is Protocol.Shutdown -> {
-                    Log.i(TAG, "Received shutdown request '${message.reason}'")
-                    Process.killProcess(Process.myPid())
-                }
-
-                else -> Log.w(TAG, "Unexpected message: ${message.javaClass.simpleName}")
             }
         }
     }
 
-    /** Sends to the host, if connected */
+    /** UI threads enqueue events; a per-session writer performs bounded socket I/O. */
     fun send(message: Protocol.Message) {
-        val output = connection ?: return
-        try {
-            synchronized(output) { Protocol.write(output, message) }
-        } catch (e: IOException) {
-            Log.w(TAG, "Failed sending '${message.javaClass.simpleName}': $e")
-        }
+        val session = connection ?: return
+        if (!session.send(message)) Log.w(TAG, "Runtime connection closed while reporting ${message.javaClass.simpleName}")
     }
 }
 

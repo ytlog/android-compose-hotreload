@@ -104,3 +104,45 @@ On the main thread, the runtime first parses the new resource provider, applies 
 The host compares each dirty group's complete scope tree against the currently applied analysis. Unchanged scope trees made dirty only by changed dependencies are sent separately from groups requiring reset. Device protocol 3 carries both lists. Stateless trees with unchanged group/call layout also recompose without reset when constants change. Changed layouts, cache initializers and dependencies evaluated by those initializers retain upstream group-reset behavior. A host analysis extension distinguishes direct cache evaluation from the bodies of cached lambda objects, so changing a callback body does not replay its cache initializer. Compiler cache calculation ranges in ClassFile debug metadata restrict this dependency check to the initializer, excluding ordinary rendering calls outside it. Missing parse/cache-range metadata conservatively retains group-reset behavior.
 
 For unchanged trees, the device enumerates existing compositions through Compose's registration observer, disposes each temporary observer and calls `ControlledComposition.invalidateAll`. Existing restart scopes are enumerated through Compose tooling composition data and marked for one forced recomposition, so unchanged arguments cannot skip a newly installed body when parent invalidations subsume child invalidations. This schedules recomposition without bashing slot groups; keyed children can move while retaining their state. It does not copy application state or replay constructors. The observer API is resolved by name because the application supplies Compose. Runtimes lacking that API retain the previous group-reset path and log that remember preservation is unavailable. When Compose reports a composition error, use its existing group-invalidation recovery path to resume failed compositions; plain scope invalidation alone cannot perform that recovery. State preservation is verified with the sample's resolved Compose runtime; this is not a claim for every older Compose release.
+
+## JB orchestration and the Android transport boundary
+
+Build tools / DevTools ↔ Host use the pinned JB orchestration directly. Request handling and
+device execution are Android adaptations of upstream logic. DEX conversion, ADB forwarding
+and Host ↔ Android LocalSocket transport belong to this project, not the unmodified JVM agent.
+
+Reloads carry the public encoding of JB `OrchestrationMessageId` end to end. Device results and
+UIRendered events return that same ID. There is no second UUID or growing ID lookup table.
+An unusable session rejects new work before DEX preparation; uncertain transactions are never
+automatically replayed.
+
+Host and device handshakes share `IoDeadline`, covering blocking I/O and trickled input. The
+device handshake allows 5 seconds. Idle reads have no timeout; a frame must complete within
+120 seconds of its first byte. A dedicated writer sends queued messages in order, allowing
+10 seconds per write. Compose render / error callbacks enqueue instead of writing to the socket.
+The queue holds at most 256 messages. Overflow or a failed write disconnects rather than silently
+dropping a reload acknowledgement. Closing clears the old queue; each connection owns a new
+queue. The Android adapter shuts down both local-socket directions before closing the descriptor.
+Device timers cannot run while Android freezes the process. Before sending a reload or reset,
+the host pings the existing runtime through its debug provider and verifies the same PID; this
+wakes the process without launching an Activity or replacing page state.
+
+Protocol 3 framing, upstream sources, ART redefinition transactions and application state models
+are unchanged. Releasing a connection does not prove rollback; the host does not reconnect and retry
+an unknown transaction automatically.
+
+Targeted device fault entry point (start the installed fixed package and stop any attached hotRun):
+
+```sh
+python3 tools/runtime-transport-test.py --serial DEVICE_SELECTOR --device-id apiNN \
+  --output build/evidence/runtime-transport-apiNN
+```
+
+The tool does not install, uninstall or restart the app. It checks silent / partial handshakes,
+idle followed by a partial frame, and a subsequent handshake, preserving the original PID and
+APK hash. The partial-frame check uses the production 120-second deadline. Use
+`--case partial-frame` or `--case handshake` to narrow a failed run. The tool requires the fixture
+to stay in the foreground and records a foreground/process change as an invalid run. These checks do not
+replace real-page state, compilation / resource, JNI-mode or full device-matrix acceptance.
+Raw evidence stays in the ignored local evidence directory. Each run requires a new output
+directory so earlier failures cannot be overwritten.

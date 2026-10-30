@@ -1,6 +1,7 @@
 package org.jetbrains.compose.reload.android.host.device
 
 import org.jetbrains.compose.reload.android.protocol.Protocol
+import org.jetbrains.compose.reload.android.protocol.IoDeadline
 import org.jetbrains.compose.reload.core.createLogger
 import org.jetbrains.compose.reload.core.error
 import java.io.Closeable
@@ -152,40 +153,22 @@ internal class RuntimeConnection private constructor(
         ): RuntimeConnection {
             require(handshakeTimeoutMillis > 0 && reloadTimeoutMillis > 0 && writeTimeoutMillis > 0)
             val socket = Socket()
-            val gate = Any()
-            var finished = false
-            var expired = false
-            val deadline = deadlines.schedule({
-                synchronized(gate) {
-                    if (!finished) {
-                        expired = true
-                        socket.close()
-                    }
-                }
-            }, handshakeTimeoutMillis, TimeUnit.MILLISECONDS)
             try {
-                socket.connect(address, handshakeTimeoutMillis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-                Protocol.writeHandshake(socket.getOutputStream())
-                Protocol.readHandshake(socket.getInputStream())
-                val hello = Protocol.read(socket.getInputStream()) as? Protocol.Hello
-                    ?: throw IOException("Expected runtime Hello")
-                if (hello.packageName != packageName || hello.protocolVersion != Protocol.VERSION) {
-                    throw IOException("Unexpected runtime identity or protocol version")
-                }
-                synchronized(gate) {
-                    if (expired) throw SocketTimeoutException("Runtime handshake timed out")
-                    finished = true
+                val hello = IoDeadline.run(socket, handshakeTimeoutMillis, "Runtime handshake") {
+                    socket.connect(address, handshakeTimeoutMillis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                    Protocol.writeHandshake(socket.getOutputStream())
+                    Protocol.readHandshake(socket.getInputStream())
+                    val hello = Protocol.read(socket.getInputStream()) as? Protocol.Hello
+                        ?: throw IOException("Expected runtime Hello")
+                    if (hello.packageName != packageName || hello.protocolVersion != Protocol.VERSION) {
+                        throw IOException("Unexpected runtime identity or protocol version")
+                    }
+                    hello
                 }
                 return RuntimeConnection(socket, hello, reloadTimeoutMillis, writeTimeoutMillis)
             } catch (error: Exception) {
                 socket.close()
-                synchronized(gate) {
-                    if (expired) throw SocketTimeoutException("Runtime handshake timed out").apply { initCause(error) }
-                }
                 throw error
-            } finally {
-                synchronized(gate) { finished = true }
-                deadline.cancel(false)
             }
         }
     }

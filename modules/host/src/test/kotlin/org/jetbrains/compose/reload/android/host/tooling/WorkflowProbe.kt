@@ -8,7 +8,8 @@ fun main(args: Array<String>) {
     val client = OrchestrationClient(OrchestrationClientRole.Tooling, args[0].toInt()).connectBlocking().getOrThrow()
     client.messages.invokeOnValue { message ->
         when (message) {
-            is OrchestrationMessage.ReloadClassesResult -> println("ReloadClassesResult success=${message.isSuccess} reason=${message.errorMessage}")
+            is OrchestrationMessage.ReloadClassesResult -> println("ReloadClassesResult success=${message.isSuccess} reason=${message.errorMessage} requestId=${message.reloadRequestId}")
+            is OrchestrationMessage.UIRendered -> println("MESSAGE UIRendered: requestId=${message.reloadRequestId} iteration=${message.iteration}")
             is OrchestrationMessage.UIException -> println("MESSAGE UIException: ${message.message}")
             else -> println("MESSAGE ${message.javaClass.simpleName}: $message")
         }

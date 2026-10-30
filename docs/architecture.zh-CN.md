@@ -104,3 +104,39 @@ runtime 在主线程先解析新资源 provider，再执行类变更，接着用
 host 比较脏组与已应用分析中的完整作用域树。只因依赖改变而变脏、树本身未改的组单独发送；无状态作用域的常量变化在分组及调用布局相同时也只重组。布局、缓存初始化器及其求值依赖变化时沿用上游组重置。分析扩展区分缓存计算中的直接调用与缓存 lambda 对象的方法体依赖，修改回调方法体不会因此重跑其缓存初始化。依据 ClassFile 调试信息中的缓存计算区间限定依赖范围，不把缓存外的正常渲染调用算进初始化器；缺少解析／缓存区间元数据时保守重置。设备协议 3 携带两类组。
 
 runtime 通过 Compose 的注册观察器同步枚举现有 composition，立即释放临时观察器，再调用 `ControlledComposition.invalidateAll`；通过 Compose tooling 的 composition data 枚举现有 restart scope，标记一次强制重组，避免父级失效合并子级失效后因参数未变而跳过新方法体；不丢弃槽位、不复制应用状态或重跑构造器，让带 key 的子组件可移动并保留状态。应用提供的 Compose 若缺少该观察 API，则保留原组重置路径，并明确记录 remember 保留不可用。Compose 存在界面异常时，沿用其组失效恢复路径以续跑失败的 composition，普通作用域失效本身不能完成异常恢复。本次设备用例只证明样例实际解析的 Compose 版本，不代表所有旧版本。
+
+## JB orchestration 与 Android 传输边界
+
+构建／DevTools ↔ Host 直接使用固定版本的 JB orchestration。
+Host 的请求处理和设备执行入口按上游逻辑适配；DEX 转换、ADB 转发及
+Host ↔ Android LocalSocket 属于本项目，不能当成上游 JVM Agent 的原样实现。
+
+重载沿途直接传递 JB `OrchestrationMessageId` 的公开编码，设备结果及 UIRendered
+返回同一 ID。不再生成第二套 UUID，也不保存随重载次数增长的 ID 映射。
+失效会话在准备 DEX 前拒绝新请求；不确定提交仍禁止自动重放。
+
+Host 和设备握手共用 `IoDeadline`，期限覆盖阻塞 I/O 和断续到达的数据。
+设备握手最多 5 秒；空闲接收不设期限，收到一帧的第一个字节后最多 120 秒
+接收完整帧。设备使用单独的 writer 线程按入队顺序发送，单次写入最多 10 秒；
+Compose 的渲染／异常回调只入队，不直接写 Socket。队列最多 256 条，
+超限或写入失败会关闭该连接，避免静默丢失重载应答。关闭时清空旧连接队列，
+新连接有独立队列。设备端先 shutdown 输入／输出，再关闭 LocalSocket。
+Android 冻结进程时，设备定时器也无法执行。Host 在发送重载或重置前，通过
+调试 Provider 唤醒现有运行时并核对 PID，不启动 Activity，也不替换页面状态。
+
+这些修改没有改变协议 3 的帧布局，也没有修改上游源码、ART 类重定义事务或
+应用状态模型。连接释放不表示未知重载已回滚；Host 不会自动接回并重试。
+
+定向设备故障入口（先启动已安装的固定包，并退出占用连接的 hotRun）：
+
+```sh
+python3 tools/runtime-transport-test.py --serial DEVICE_SELECTOR --device-id apiNN \
+  --output build/evidence/runtime-transport-apiNN
+```
+
+工具不安装、卸载或重启应用，检查无应答／半握手、空闲后半帧超时及再次握手，
+并核对原 PID 与 APK 哈希。半帧检查使用生产的 120 秒期限；可用 `--case partial-frame`
+或 `--case handshake` 缩小失败复验范围。工具要求测试页面保持前台，前台或进程
+改变会记录为无效运行。这不替代真实页面状态
+保留、编译／资源更新、JNI 模式或设备完整矩阵。原始记录仅存本地忽略目录，
+每次运行须使用新的输出目录，避免覆盖之前的失败记录。

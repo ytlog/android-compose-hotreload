@@ -28,7 +28,7 @@ import org.jetbrains.compose.reload.core.isClass
 import org.jetbrains.compose.reload.core.sortedByTopology
 import org.jetbrains.compose.reload.core.warn
 import java.io.File
-import java.util.UUID
+import org.jetbrains.compose.reload.orchestration.OrchestrationMessageId
 import java.util.concurrent.atomic.AtomicInteger
 
 private val logger = createLogger()
@@ -59,8 +59,9 @@ internal fun Context.reload(
     index: ApplicationIndex, dexer: Dexer, device: Device,
     pendingChanges: Map<File, ClassChange>,
     resources: ResourceIndex,
-    onDeviceRequest: (String) -> Unit,
+    requestId: OrchestrationMessageId,
 ): Try<ResolvedDirtyScopes> = Try {
+    device.ensureUsable()
     // Validate before adding/redefining any classes, including mixed code/resource edits.
     val resourceApk = resources.pending()
     val classPool = index.classPool()
@@ -157,8 +158,7 @@ internal fun Context.reload(
     }
     val groups = composeInvalidation(index.currentApplicationInfo, attempt.pending, dirty.dirtyScopes,
         invocationTypes::declarations, invocationTypes::mayOverlap, compatibleConstructors)
-    val deviceRequestId = UUID.randomUUID().toString()
-    onDeviceRequest(deviceRequestId)
+    val deviceRequestId = requestId.encodeToByteArray().decodeToString()
     val result = device.reload(
         Protocol.Reload(
             deviceRequestId,

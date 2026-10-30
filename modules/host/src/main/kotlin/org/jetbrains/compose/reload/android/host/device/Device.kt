@@ -45,6 +45,8 @@ internal class Device private constructor(
     val hello: Protocol.Hello get() = connection.hello
     val closed get() = connection.closed
 
+    fun ensureUsable() = connection.ensureUsable()
+
     fun onMessage(listener: (Protocol.Message) -> Unit) = connection.onMessage(listener)
 
     fun send(message: Protocol.Message) {
